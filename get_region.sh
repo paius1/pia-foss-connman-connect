@@ -18,6 +18,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+# modified for coreELEC/connman plgroves gmail 2022
 
 # MAX_LATENCY below 1 just don't seem to work
 MAX_LATENCY="${MAX_LATENCY:-1}"
@@ -32,8 +33,8 @@ check_tool() {
   fi
 }
 # Now we call the function to make sure we can use curl and jq.
-check_tool curl
-check_tool jq
+    check_tool /opt/bin/curl
+    check_tool /opt/bin/jq
 
 # If the server list has less than 1000 characters, it means curl failed.
 check_all_region_data() {
@@ -56,7 +57,7 @@ check_all_region_data() {
 # Exit with code 1 if the REGION_ID provided is invalid
 get_selected_region_data() {
   regionData="$( echo "$all_region_data" |
-  jq --arg REGION_ID "$selectedRegion" -r \
+  /opt/bin/jq --arg REGION_ID "$selectedRegion" -r \
   '.regions[] | select(.id==$REGION_ID)')"
   if [[ -z $regionData ]]; then
     echo -e "${red}The REGION_ID $selectedRegion is not valid.${nc}
@@ -153,11 +154,11 @@ if [[ $selectedRegion == "none" ]]; then
     echo "Port Forwarding is enabled, non-PF servers excluded."
     echo
     summarized_region_data="$( echo "$all_region_data" |
-      jq -r '.regions[] | select(.port_forward==true) |
+      /opt/bin/jq -r '.regions[] | select(.port_forward==true) |
       .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   else
     summarized_region_data="$( echo "$all_region_data" |
-    jq -r '.regions[] |
+    /opt/bin/jq -r '.regions[] |
     .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   fi
   echo -e Testing regions that respond \
@@ -184,19 +185,19 @@ fi
 
 get_selected_region_data
 
-bestServer_meta_IP=$(echo "$regionData" | jq -r '.servers.meta[0].ip')
-bestServer_meta_hostname=$(echo "$regionData" | jq -r '.servers.meta[0].cn')
-bestServer_WG_IP=$(echo "$regionData" | jq -r '.servers.wg[0].ip')
-bestServer_WG_hostname=$(echo "$regionData" | jq -r '.servers.wg[0].cn')
-bestServer_OT_IP=$(echo "$regionData" | jq -r '.servers.ovpntcp[0].ip')
-bestServer_OT_hostname=$(echo "$regionData" | jq -r '.servers.ovpntcp[0].cn')
-bestServer_OU_IP=$(echo "$regionData" | jq -r '.servers.ovpnudp[0].ip')
-bestServer_OU_hostname=$(echo "$regionData" | jq -r '.servers.ovpnudp[0].cn')
+bestServer_meta_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].ip')
+bestServer_meta_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].cn')
+bestServer_WG_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].ip')
+bestServer_WG_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].cn')
+bestServer_OT_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].ip')
+bestServer_OT_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].cn')
+bestServer_OU_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].ip')
+bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].cn')
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
-  echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | jq -r '.name')${nc}"
-  if echo "$regionData" | jq -r '.geo' | grep true > /dev/null; then
+  echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}"
+  if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then
     echo " (geolocated region)."
   else
     echo "."
@@ -227,7 +228,7 @@ if [[ -z $PIA_TOKEN ]]; then
   ./get_token.sh
   PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token )
   export PIA_TOKEN
-  rm -f /opt/etc/piavpn-manual/token
+#  rm -f /opt/etc/piavpn-manual/token
 else
   echo -e "Using existing token ${green}$PIA_TOKEN${nc}."
   echo
@@ -244,7 +245,7 @@ if [[ $VPN_PROTOCOL == "wireguard" ]]; then
   echo
   PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
     WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
-  #rm -f /opt/etc/piavpn-manual/latencyList
+#  rm -f /opt/etc/piavpn-manual/latencyList
   exit 0
 fi
 
