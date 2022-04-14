@@ -3,21 +3,7 @@
 # Bash script for port-forwarding on the PIA 'next-gen' network.
 # started with https://github.com/thrnz/docker-wireguard-pia/blob/master/extra/pf.sh
 # and hacked this together
-# Requires curl.
-#
-# Options:
-#  -t </path/to/tokenfile>      Path to a valid PIA auth token
-#  -i <pf api ip>               (Optional) IP to send port-forward API requests to.
-#                               An 'educated guess' is made if not specified.
-#  -l <vpn location>            e.g. ca_toronto
-#  -n <vpn common name>         (Optional) Common name of the VPN server (eg. "london411")
-#                               Requests will be insecure if not specified
-#  -p </path/to/port.dat>       (Optional) Dump forwarded port here for access by other scripts
-#
-# Examples:
-#   pf.sh -t ~/.pia-token
-#   pf.sh -t ~/.pia-token -n sydney402
-#   pf.sh -t ~/.pia-token -i 10.13.14.1 -n london416 -p /port.dat
+# Requires curl jq
 #
 # For port forwarding on the next-gen network, we need a valid PIA auth token (see get_token.sh) and to know the address to send API requests to.
 #
@@ -34,8 +20,16 @@
 # based on what was found in the source code to their desktop app (v.2.2.0):
 # https://github.com/pia-foss/desktop/blob/2.2.0/daemon/src/portforwardrequest.cpp
 # Use at your own risk!
+# modified for coreELEC/connman plgroves gmail 2022
 
-  PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
+    # PIA's scripts are set to a relative path
+      cd "${0%/*}"
+
+    PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
+
+  # where to store the port number for later usage
+    portfile='/tmp/port.dat'
+
 # An error with no recovery logic occured
 fatal_error () {
   cleanup
@@ -55,50 +49,23 @@ finish () {
 }
 trap finish SIGTERM SIGINT SIGQUIT
 
-usage() {
-  echo "Options:
- -t </path/to/tokenfile>      Path to a valid PIA auth token
- -i <pf api ip>               (Optional) IP to send port-forward API requests to.
-                              An 'educated guess' is made if not specified.
- -n <vpn common name>         (Optional) Common name of the VPN server (eg. \"toronto410\")
-                              Requests will be insecure if not specified
- -p </path/to/port.dat>       (Optional) Dump forwarded port here for access by other scripts"
-}
+  # We don't use any error handling or retry logic beyond what curl provides
+    curl_max_time=15
+    curl_retry=5
+    curl_retry_delay=15
 
-while getopts ":t:i:n:c:p:l:" args; do
-  case ${args} in
-    t)
-      tokenfile=$OPTARG
-      ;;
-    i)
-      vpn_ip=$OPTARG
-      ;;
-    n)
-      vpn_cn=$OPTARG
-      ;;
-    c)
-      cacert=$OPTARG
-      ;;
-    p)
-      portfile=$OPTARG
-      ;;
-    l)
-      vpn_location=$OPTARG
-      ;;  
-  esac
-done
-
- #echo tokenfile $tokenfile vpn_ip $vpn_ip vpn_cn $vpn_cn cacert $cacert portfile $portfile
-
-# We don't use any error handling or retry logic beyond what curl provides
-curl_max_time=15
-curl_retry=5
-curl_retry_delay=15
-
- [[ "${portfile}" ]] || portfile='/storage/.config/pia/port.dat'
- #[[ "${tokenfile}" ]] || tokenfile='/storage/.config/pia/pia-token'
- [[ "${tokenfile}" ]] || tokenfile='/opt/etc/piavpn-manual/token'
- [[ -z $PIA_TOKEN ]] && PIA_TOKEN="$(head -1 /opt/etc/piavpn-manual/token)"
+  # Check if the mandatory environment variables are set.
+    #if [[ ! $PF_GATEWAY || ! $PIA_TOKEN || ! $PF_HOSTNAME ]]; then
+    if [[ ! $PIA_TOKEN ]]; then
+      echo This script requires:
+      echo PIA_TOKEN   - the token you used to connect to the vpn services
+      echo
+      echo An easy solution is to just run
+      echo 'PIA_TOKEN=$(head -1 /opt/etc/piavpn-manual/token)'
+      echo then PIA_TOKEN=\${PIA_TOKEN} ${BASH_SOURCE}
+      echo 
+    exit 1
+    fi
 
 bind_port () {
   pf_bind=$(curl --get --silent --show-error \
@@ -107,7 +74,7 @@ bind_port () {
       --data-urlencode "signature=$pf_getsignature" \
       "${verify}" \
       "https://$pf_host:19999/bindPort")
-  if [ "$(echo "${pf_bind}" | jq -r .status)" != "OK" ]; then
+  if [ "$(echo "${pf_bind}" | /opt/bin/jq -r .status)" != "OK" ]; then
     echo "$(date): bindPort error"
     echo "${pf_bind}"
     fatal_error
@@ -120,15 +87,15 @@ get_sig () {
     --data-urlencode "token=${PIA_TOKEN}" \
     "${verify}" \
     "https://$pf_host:19999/getSignature")
-  if [ "$(echo "${pf_getsig}" | jq -r .status)" != "OK" ]; then
+  if [ "$(echo "${pf_getsig}" | /opt/bin/jq -r .status)" != "OK" ]; then
     echo "$(date): getSignature error"
     echo "${pf_getsig}"
     fatal_error
   fi
-  pf_payload=$(echo "${pf_getsig}" | jq -r .payload)
-  pf_getsignature=$(echo "${pf_getsig}" | jq -r .signature)
-  pf_port=$(echo "${pf_payload}" | base64 -d | jq -r .port)
-  pf_token_expiry_raw=$(echo "${pf_payload}" | base64 -d | jq -r .expires_at)
+  pf_payload=$(echo "${pf_getsig}" | /opt/bin/jq -r .payload)
+  pf_getsignature=$(echo "${pf_getsig}" | /opt/bin/jq -r .signature)
+  pf_port=$(echo "${pf_payload}" | base64 -d | /opt/bin/jq -r .port)
+  pf_token_expiry_raw=$(echo "${pf_payload}" | base64 -d | /opt/bin/jq -r .expires_at)
   # Coreutils date doesn't need format specified (-D), whereas BusyBox does
   if date --help 2>&1 /dev/null | grep -i 'busybox' > /dev/null; then
     pf_token_expiry=$(date -D %Y-%m-%dT%H:%M:%S --date="$pf_token_expiry_raw" +%s)
@@ -136,6 +103,18 @@ get_sig () {
     pf_token_expiry=$(date --date="$pf_token_expiry_raw" +%s)
   fi
 }
+
+        function logger() {
+            local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}"
+            local tab spaces 
+            tab="${TAB:-100}"
+            IFS="" spaces="$(printf "%$((tab*2))s")"
+            printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
+}
+
+    log='/tmp/pf.log'
+    LOG="${1:-${log}}"
+    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
 
 # Rebind every 15 mins (same as desktop app)
 pf_bindinterval=$(( 15 * 60))
@@ -146,16 +125,17 @@ pf_minreuse=$(( 60 * 60 * 24 * 7 ))
 pf_remaining=0
 pf_firstrun=1
 
-# Minimum args needed to run
-if [ -z "$tokenfile" ]; then
-  usage && exit 0
-fi
+[ -z $PIA_TOKEN ] && { PIA_TOKEN="$(head -1 /opt/etc/piavpn-manual/token)";
+                       logger "had to set PIA_TOKEN!!!!!!!!!!!!!!!"; }
+## Minimum args needed to run
+#if [ -z "$tokenfile" ]; then
+  #usage && exit 0
+#fi
 
 # Hacky way to try to automatically get the API IP: use the first hop of a traceroute.
 # This seems to work for both Wireguard and OpenVPN.
 # Ideally we'd have been provided a cn, in case we 'guess' the wrong IP.
 # Must be a better way to do this.
-if [ -z "$vpn_ip" ]; then
   vpn_ip=$( /opt/sbin/traceroute -4 -m 1 privateinternetaccess.com | tail -n 1 | awk '{print $2}')
   # Very basic sanity check - make sure it matches 10.x.x.1
   if ! echo "$vpn_ip" | grep '10\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.1' > /dev/null; then
@@ -163,31 +143,13 @@ if [ -z "$vpn_ip" ]; then
     fatal_error
   fi
   echo "$(date): Using $vpn_ip as API endpoint"
-fi
-
-# If we've been provided a cn, we can verify using the PIA ca cert
-if [ -n "$vpn_cn" ]; then
-  # Get the PIA ca crt if we weren't given it
-  if [ -z "$cacert" ]; then
-    echo "$(date): Getting PIA ca cert"
-    cacert=$(mktemp)
-    cacert_istemp=1
-    if ! curl --get --silent --max-time "$curl_max_time" --output "$cacert" \
-      --retry $curl_retry --retry-delay $curl_retry_delay --max-time $curl_max_time \
-      "https://raw.githubusercontent.com/pia-foss/desktop/master/daemon/res/ca/rsa_4096.crt"; then
-      echo "(date): Failed to download PIA ca cert"
-      fatal_error
-    fi
-  fi
-  verify="--cacert $cacert --resolve $vpn_cn:19999:$vpn_ip"
-  pf_host="$vpn_cn"
-  echo "$(date): Verifying API requests. CN: $vpn_cn"
-else
   # For simplicity, use '--insecure' by default, though show a warning
   echo "$(date): API requests may be insecure. Specify a common name using -n."
   verify="--insecure"
   pf_host="$vpn_ip"
-fi
+
+# If are not using a cn, and cannot verify using the PIA ca cert
+# this is insecure
 
 # Main loop
 while true; do
@@ -195,29 +157,34 @@ while true; do
   # Get a new pf token as the previous one will expire soon
   if [ $pf_remaining -lt $pf_minreuse ]; then
     if [ $pf_firstrun -ne 1 ]; then
-      echo "$(date): PF token will expire soon. Getting new one."
+      logger "$(date): PF token will expire soon. Getting new one."
     else
-      echo "$(date): Getting PF token"
+      logger "$(date): Getting PF token"
       pf_firstrun=0
     fi
     get_sig
-    echo "$(date): Obtained PF token. Expires at $pf_token_expiry_raw"
+    logger "$(date): Obtained PF token. Expires at $pf_token_expiry_raw"
     bind_port
-    echo "$(date): Server accepted PF bind"
-    echo "$(date): Forwarding on port=\"${pf_port}\""
-    echo "$(date): Rebind interval: $pf_bindinterval seconds"
+    logger "$(date): Server accepted PF bind"
+    logger "$(date): Forwarding on port=\"${pf_port}\""
+  # send Forwarding port to journal  
+    >&2 echo "Forwarding on port=\"${pf_port}\""
+    logger "$(date): Rebind interval: $pf_bindinterval seconds"
     # Dump port here if requested
     [ -n "$portfile" ] && echo "$(date): Port dumped to $portfile" && echo "${pf_port}" > "$portfile"
-    # Send port forwarding to transmission
-      #if [[ "${pf_port}" =~ ^[0-9]+$ ]]; then
-         echo "$(date): adding peer port ${pf_port} to transmission settings"
-         transmission-remote localhost:9091 --auth=root:password  -p "${pf_port}" >/dev/null 2>&1
-         # add port to iptables
-           echo "$(date): adding peer port ${pf_port} to firewall"
-           iptables -I INPUT -p tcp --dport "${pf_port}" -j ACCEPT
-         sleep 10
-         echo "$(date):" "$(transmission-remote localhost:9091 --auth=root:password  -pt)"
-      #fi
+
+  # add port to iptables
+    echo "$(date): adding peer port ${pf_port} to firewall"
+    iptables -I INPUT -p tcp --dport "${pf_port}" -j ACCEPT
+
+  # Send port forwarding to transmission
+    if [[ "${pf_port}" =~ ^[0-9]+$ ]] && grep -q alive < <(/opt/etc/init.d/S88transmission check)
+    then
+       logger "$(date): adding peer port ${pf_port} to transmission settings"
+       transmission-remote localhost:9091 --auth=root:password  -p "${pf_port}" >/dev/null 2>&1
+       sleep 10
+       #echo "$(date):" "$(transmission-remote localhost:9091 --auth=root:password  -pt)"
+    fi
   fi
   sleep $pf_bindinterval &
   wait $!
