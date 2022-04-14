@@ -22,23 +22,30 @@
 ########################################################################
 # PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd VPN_PROTOCOL=wireguard PREFERRED_REGION= PIA_PF=true/false ./run_setup.sh 
 
-# PIA's scripts are set to a relative path
-  cd "${0%/*}"
-
-# stop any VPN's previously started
-  connmanctl disconnect "$(grep VPN < <( connmanctl services) | awk '{print $NF}')"
-
-# stop transmission in the wild
-  /opt/etc/init.d/S88transmission stop
-  
-# clear firewall
-  iptables-restore < /storage/.config/iptables/openrules.v4 
-
-# stop portforwarding 
-  ps aux|grep '[p]f\.' | awk '{print $2}' | xargs kill
-
-# skip inputs
-  source .env
+    # PIA's scripts are set to a relative path
+      cd "${0%/*}"
+      
+      export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
+    
+    # wait for network
+      until ping -c 1  -W 1 1.1.1.1 > /dev/null 2>&1
+      do sleep 1
+      done
+    
+    # stop transmission in the wild
+      /opt/etc/init.d/S88transmission stop 2>/dev/null
+    
+    # stop any VPN's previously started
+      connmanctl disconnect "$(grep VPN < <( connmanctl services) | awk '{print $NF}')"
+      
+    # clear firewall
+      iptables-restore < openrules.v4 
+    
+    # stop portforwarding 
+      ps aux|grep '[p]f\.' | awk '{print $2}' | xargs kill 2>&1 >/dev/null
+    
+    # skip inputs
+      source .env
 
 # restore a sane DNS
 cat << EOF > /etc/resolv.conf
@@ -161,6 +168,8 @@ export PIA_PF
 echo -e "${green}PIA_PF=$PIA_PF${nc}"
 echo
 
+    # Wireguard and ipv6 are not supported
+      export DISABLE_IPV6=true
 # Check for in-line definition of DISABLE_IPV6 and prompt for input
 if [[ -z $DISABLE_IPV6 ]]; then
   echo "Having active IPv6 connections might compromise security by allowing"
@@ -345,7 +354,7 @@ For example, you can try 0.2 for 200ms allowed latency.
 done
 
 if [[ -z $VPN_PROTOCOL ]]; then
-  VPN_PROTOCOL="none"
+  VPN_PROTOCOL="wireguard"
 fi
 # This section asks for user connection preferences
 case $VPN_PROTOCOL in
@@ -419,4 +428,4 @@ echo -e "${green}PIA_DNS=$PIA_DNS${nc}"
 CONNECTION_READY="true"
 export CONNECTION_READY
 
-./get_region.sh
+./get_region.sh 2>/dev/null
