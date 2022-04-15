@@ -33,9 +33,10 @@
   # stop any previous instances of pf.sh
     pids=($(pidof pf.sh))
     mypid=$$
-echo "number of pf.sh pids ${#pids[@]}"
+
     if [ "${#pids[@]}" -gt 1 ]
     then # remove this instance from pids
+         echo "pf.sh is already running, will stop"
          for i in ${!pids[@]}
          do
             if [ "${pids[$i]}" == "$mypid" ]
@@ -160,7 +161,7 @@ pf_firstrun=1
   fi
   echo "$(date): Using $vpn_ip as API endpoint"
   # For simplicity, use '--insecure' by default, though show a warning
-  echo "$(date): API requests may be insecure. Specify a common name using -n."
+  echo "$(date): API requests will be insecure until I figure out otherwise. "
   verify="--insecure"
   pf_host="$vpn_ip"
 
@@ -193,14 +194,6 @@ while true; do
     echo "$(date): adding peer port ${pf_port} to firewall"
     iptables -I INPUT -p tcp --dport "${pf_port}" -j ACCEPT
 
-  # Send port forwarding to transmission
-    if [[ "${pf_port}" =~ ^[0-9]+$ ]] && grep -q alive < <(/opt/etc/init.d/S88transmission check)
-    then
-       logger "$(date): adding peer port ${pf_port} to transmission settings"
-       transmission-remote localhost:9091 --auth=root:password  -p "${pf_port}" >/dev/null 2>&1
-       sleep 10
-       #echo "$(date):" "$(transmission-remote localhost:9091 --auth=root:password  -pt)"
-    fi
   fi
   sleep $pf_bindinterval &
   wait $!
