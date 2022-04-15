@@ -22,35 +22,36 @@
 # Use at your own risk!
 # modified for coreELEC/connman plgroves gmail 2022
 
-    # PIA's scripts are set to a relative path
-      cd "${0%/*}"
+  # PIA's scripts are set to a relative path
+    cd "${0%/*}"
 
     PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
 
   # where to store the port number for later usage
     portfile='/tmp/port.dat'
 
-  # stop any previous instances of pf.sh
-    pids=($(pidof pf.sh))
-    mypid=$$
+        function logger() {
+            local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}"
+            local tab spaces 
+            tab="${TAB:-100}"
+            IFS="" spaces="$(printf "%$((tab*2))s")"
+            printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
+}
 
-    if [ "${#pids[@]}" -gt 1 ]
-    then # remove this instance from pids
-         echo "pf.sh is already running, will stop"
-         for i in ${!pids[@]}
-         do
-            if [ "${pids[$i]}" == "$mypid" ]
-            then unset pids[$i]
-            fi
-         done
-         echo "${pids[@]}" | xargs kill >/dev/null 2>&1
-    fi
+    log='/tmp/pf.log'
+    LOG="${1:-${log}}"
+    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
 
 # An error with no recovery logic occured
 fatal_error () {
   cleanup
   echo "$(date): Fatal error"
-  echo "$(date): Attempting Restarting"
+  echo -n "$(date): Attempting Restarting port forwarding in "
+        for i in {5..1}; do
+          echo -n "$i..."
+        done
+        echo
+        sleep 15
   PIA_TOKEN="${PIA_TOKEN}" "$(pwd)/${BASH_SOURCE##*/}" >> /tmp/pf.log &
   exit 1
 }
@@ -72,6 +73,9 @@ trap finish SIGTERM SIGINT SIGQUIT
     curl_retry=5
     curl_retry_delay=15
 
+    [ -z $PIA_TOKEN ] && { PIA_TOKEN="$(head -1 /opt/etc/piavpn-manual/token)";
+                           echo "had to set PIA_TOKEN!!!!!!!!!!!!!!!"; }
+
   # Check if the mandatory environment variables are set.
     if [[ ! $PIA_TOKEN ]]; then
       echo This script requires:
@@ -79,10 +83,32 @@ trap finish SIGTERM SIGINT SIGQUIT
       echo
       echo An easy solution is to just run
       echo 'PIA_TOKEN=$(head -1 /opt/etc/piavpn-manual/token)'
-      echo then PIA_TOKEN=\${PIA_TOKEN} ${BASH_SOURCE}
+      echo then PIA_TOKEN=\${PIA_TOKEN} "$(pwd)/${BASH_SOURCE##*/}"
       echo 
     exit 1
     fi
+
+  # replace any currently running pf.sh
+    pids=($(pidof pf.sh))
+    mypid=$$
+>&2 echo "number of pf.sh pids ${#pids[@]}"
+    if [ "${#pids[@]}" -gt 1 ]
+    then # remove this instance from pids[@]
+         logger "pf.sh is already running, will stop other"
+         for i in ${!pids[@]}
+         do
+            if [ "${pids[$i]}" == "$mypid" ]
+            then unset pids[$i]
+            fi
+         done
+         echo "${pids[@]}" | xargs kill >/dev/null 2>&1
+    fi
+
+  # wait for privateinternetaccess
+    until ping -c 1  -W 1  privateinternetaccess.com > /dev/null 2>&1
+    do logger "wait for privateinternetaccess"
+       sleep 5
+    done
 
 bind_port () {
   pf_bind=$(curl --get --silent --show-error \
@@ -121,18 +147,6 @@ get_sig () {
   fi
 }
 
-        function logger() {
-            local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}"
-            local tab spaces 
-            tab="${TAB:-100}"
-            IFS="" spaces="$(printf "%$((tab*2))s")"
-            printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
-}
-
-    log='/tmp/pf.log'
-    LOG="${1:-${log}}"
-    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
-
 # Rebind every 15 mins (same as desktop app)
 pf_bindinterval=$(( 15 * 60))
 # Get a new token when the current one has less than this remaining
@@ -142,12 +156,8 @@ pf_minreuse=$(( 60 * 60 * 24 * 7 ))
 pf_remaining=0
 pf_firstrun=1
 
-[ -z $PIA_TOKEN ] && { PIA_TOKEN="$(head -1 /opt/etc/piavpn-manual/token)";
-                       logger "had to set PIA_TOKEN!!!!!!!!!!!!!!!"; }
-## Minimum args needed to run
-#if [ -z "$tokenfile" ]; then
-  #usage && exit 0
-#fi
+# IF ARE NOT USING A CN, AND CANNOT VERIFY USING THE PIA CA CERT
+# THIS IS INSECURE
 
 # Hacky way to try to automatically get the API IP: use the first hop of a traceroute.
 # This seems to work for both Wireguard and OpenVPN.
@@ -156,17 +166,14 @@ pf_firstrun=1
   vpn_ip=$( /opt/sbin/traceroute -4 -m 1 privateinternetaccess.com | tail -n 1 | awk '{print $2}')
   # Very basic sanity check - make sure it matches 10.x.x.1
   if ! echo "$vpn_ip" | grep '10\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.1' > /dev/null; then
-    echo "$(date): Automatically getting API IP failed."
+    logger "Automatically getting API IP failed."
     fatal_error
   fi
-  echo "$(date): Using $vpn_ip as API endpoint"
+  logger "Using $vpn_ip as API endpoint"
   # For simplicity, use '--insecure' by default, though show a warning
-  echo "$(date): API requests will be insecure until I figure out otherwise. "
+  logger "$(date): API requests will be insecure until I figure out otherwise. "
   verify="--insecure"
   pf_host="$vpn_ip"
-
-# If are not using a cn, and cannot verify using the PIA ca cert
-# this is insecure
 
 # Main loop
 while true; do
@@ -180,22 +187,24 @@ while true; do
       pf_firstrun=0
     fi
     get_sig
-    logger "$(date): Obtained PF token. Expires at $pf_token_expiry_raw"
+    logger "Obtained PF token. Expires at $pf_token_expiry_raw"
     bind_port
-    logger "$(date): Server accepted PF bind"
-    logger "$(date): Forwarding on port=\"${pf_port}\""
+    logger "Server accepted PF bind"
+    logger "Forwarding on port=\"${pf_port}\""
   # send Forwarding port to journal  
     >&2 echo "Forwarding on port=\"${pf_port}\""
-    logger "$(date): Rebind interval: $pf_bindinterval seconds"
+    logger "Rebind interval: $pf_bindinterval seconds"
     # Dump port here if requested
-    [ -n "$portfile" ] && echo "$(date): Port dumped to $portfile" && echo "${pf_port}" > "$portfile"
+    [ -n "$portfile" ] && { echo "${pf_port}" > "$portfile" && \
+                            logger "Port dumped to $portfile"; }
 
   # add port to iptables
-    echo "$(date): adding peer port ${pf_port} to firewall"
+    logger "adding peer port ${pf_port} to firewall"
     iptables -I INPUT -p tcp --dport "${pf_port}" -j ACCEPT
 
   fi
   sleep $pf_bindinterval &
   wait $!
+    logger "Rebinding ...."
   bind_port
 done
