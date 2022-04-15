@@ -8,6 +8,43 @@ cd pia-foss-connman-connect
 sudo ./run_setup.sh
 ```
 
+Included is a systemd unit to automate a VPN connection
+
+```
+to run as a service you need:
+
+  Predefined variables for the pia-foss manual connections scripts
+  saved to:  /path/to/these/scripts/.env
+  without these the pia-foss/manual-connections scripts run interactively
+  and the unit will fail
+ 
+  minimum file
+               PIA_USER=pXXXXXXX
+               PIA_PASS=p45sw0rdxx
+               AUTOCONNECT='false'  if this is set 'true' PREFERRED_REGION is ignored
+               PREFERRED_REGION=someregion from /opt/etc/piavpn-manual/latencyList e.g. ca_toronto
+               VPN_PROTOCOL=wireguard
+               PIA_PF='true|false'
+               PIA_DNS='true|false'
+  optional:
+               export CONNMAN_CONNECT='true'
+               export mydns=192.168.1.136
+
+  Edit service file and replace /path/to/scripts with your actual path to scripts
+  Edit pre_up.sh post_up.sh and shutdown.sh to suit your needs.
+  
+  Copy pia-wireguard.service to /storage/.config/system.d/
+    systemctl daemon-reload
+    systemctl enable pia-wireguard.service
+    systemctl start pia-wireguard.service
+    systemctl status pia-wireguard.service
+    journactl -f -u pia-wireguard.service
+
+```
+
+
+FROM PIA-FOSS MANUAL-CONNECTIONS:
+
 The scripts were written so that they are easy to read and to modify. The code also has a lot of comments, so that you find all the information you might need. We hope you will enjoy forking the repo and customizing the scripts for your setup!
 
 ## Table of Contents
