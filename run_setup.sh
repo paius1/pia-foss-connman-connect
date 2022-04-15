@@ -21,7 +21,8 @@
 # modified for coreELEC/connman plgroves gmail 2022
 
 ########################################################################
-# PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd VPN_PROTOCOL=wireguard PREFERRED_REGION= PIA_PF=true/false ./run_setup.sh 
+# PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd AUTOCONNECT=true PIA_DNS-true|false PIA_PF=true|false ./run_setup.sh 
+# the more variables you set the less interactive
 
   # PIA's scripts are set to a relative path
     cd "${0%/*}"
