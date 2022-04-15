@@ -19,6 +19,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+  # PIA's scripts are set to a relative path
+    cd "${0%/*}"
+
+    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
+
 # This function allows you to check if the required tools have been installed.
 check_tool() {
   cmd=$1
@@ -210,20 +215,22 @@ sleep 2
     fi
 
     # This section will stop the script if PIA_PF is not set to "true".
-    # the command for port forwarding will be sent to /tmp/pf.log
+    # the command for port forwarding will be sent to /tmp/port_forward.log
     if [[ $PIA_PF != "true" ]]; then
       echo "If you want to also enable port forwarding, you can start the script:"
-      echo "PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh" | tee /tmp/pf.log
+#      echo "PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh" | tee /tmp/pf.log
+      echo -e "PIA_TOKEN=$PIA_TOKEN" \
+        "PF_GATEWAY=$WG_SERVER_IP" "PF_HOSTNAME=$WG_HOSTNAME" \
+        "$(pwd)/port_forwarding.sh${nc}" | tee  /tmp/port_forward.log
       echo
       echo "The location used must be port forwarding enabled, or this will fail."
       echo "Calling the ./get_region script with PIA_PF=true will provide a filtered list."
+      echo "This script must run to maintain an open port"
+      echo "So it will tie up a console unless run in the background"
       exit 1
     fi
 
-  # Called from command line not systemd service
-    if [[ -t 0 || -p /dev/stdin ]]
-    then echo -ne "This script got started with PIA_PF=true.
-        and from the cli
+     echo -ne "This script got started with PIA_PF=true.
         Starting port forwarding in "
         for i in {5..1}; do
           echo -n "$i..."
@@ -232,12 +239,13 @@ sleep 2
         echo
         echo
 
-        echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh"
-        echo "logging to /tmp/pf.log"
+#        echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh"
+        echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN \\
+          PF_GATEWAY=$WG_SERVER_IP" "PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh"
+        echo "logging to /tmp/port_forward.log"
 
-        PIA_TOKEN=$PIA_TOKEN \
-          ./pf.sh  > /tmp/pf.log &
-    fi
+       PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \
+          ./port_forwarding.sh > /tmp/port_forward.log &
 #########
  exit 0 #
 #########

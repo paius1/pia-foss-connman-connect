@@ -20,6 +20,11 @@
 # SOFTWARE.
 # modified for coreELEC/connman plgroves gmail 2022
 
+  # PIA's scripts are set to a relative path
+    cd "${0%/*}"
+
+    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
+
 # MAX_LATENCY below 1 just don't seem to work
 MAX_LATENCY="${MAX_LATENCY:-1}"
 
@@ -184,7 +189,7 @@ else
 fi
 
 get_selected_region_data
-
+    echo "$regionData" > /tmp/regionData
 bestServer_meta_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].ip')
 bestServer_meta_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].cn')
 bestServer_WG_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].ip')
@@ -228,7 +233,8 @@ if [[ -z $PIA_TOKEN ]]; then
   ./get_token.sh
   PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token )
   export PIA_TOKEN
-#  rm -f /opt/etc/piavpn-manual/token
+    # dont delete, need this for post_up.sh pf.sh
+      #rm -f /opt/etc/piavpn-manual/token
 else
   echo -e "Using existing token ${green}$PIA_TOKEN${nc}."
   echo
@@ -245,7 +251,9 @@ if [[ $VPN_PROTOCOL == "wireguard" ]]; then
   echo
   PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
     WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
-#  rm -f /opt/etc/piavpn-manual/latencyList
+
+    # keep this file to get PREFERRED_REGION
+      #rm -f /opt/etc/piavpn-manual/latencyList
   exit 0
 fi
 

@@ -44,14 +44,13 @@
     namesever 1.1.1.1
 	EOF
 
+  # stop port forwarding 
+    logger "stopping port forwarding"
+    ps aux|grep [p]ort_forward | awk '{print $2}' | xargs kill -9 >/dev/null 2>&1
+
   # disconnect VPN
     logger "Disconnecting from Private Internet Access"
     connmanctl disconnect "$(grep VPN < <( connmanctl services) | awk '{print $NF}')"
 
 # add anything else such stopping applications and port forwarding
-
-  # stop portforwarding 
-    logger "stopping port forward binging"
-    ps aux|grep '[p]f\.' | awk '{print $2}' | xargs kill >/dev/null 2>&1
-
 exit 0

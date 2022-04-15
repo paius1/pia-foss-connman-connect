@@ -54,6 +54,6 @@
 
   # stop portforwarding 
     logger "Stopping port forwarding"
-    ps aux|grep '[p]f\.' | awk '{print $2}' | xargs kill >/dev/null 2>&1
+    ps aux|grep [p]ort_forward | awk '{print $2}' | xargs kill >/dev/null 2>&1
 
 exit 0

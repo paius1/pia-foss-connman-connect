@@ -49,8 +49,8 @@
 	EOF
     done
 
-  # disconnect VPN
-    connmanctl disconnect "$(grep VPN < <( connmanctl services) | awk '{print $NF}')"
+  # disconnect vpn_
+    connmanctl disconnect "$(grep -i vpn < <( connmanctl services) | awk '{print $NF}')"
 
 # end of major changes
 ########################################################################

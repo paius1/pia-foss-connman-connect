@@ -3,7 +3,7 @@
 #    SCRIPTNAME 
 #        runs after pia-wireguard service is up
 #        starts things that are dependent on vpn
-#         e.g. port forwarding and transmission
+#         e.g. transmission
 #        
 ####
 # 
@@ -28,32 +28,6 @@
 
   # PIA's scripts are set to a relative path
     cd "${0%/*}" || exit 255
-
-  # get PIA_PF
-    source .env 2>/dev/null
-
-    if [[ $PIA_PF != "true" ]]; then
-      echo "If you want to also enable port forwarding, you can start the script:"
-      echo "PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh" | tee /tmp/pf.log
-      echo
-      echo "The location used must be port forwarding enabled, or this will fail."
-      echo "Calling the ./get_region script with PIA_PF=true will provide a filtered list."
-      exit 1
-    fi
-
-    echo -n "This script got started with PIA_PF=true.
-    
-    Starting port forwarding in "
-    for i in {5..1}; do
-      echo -n "$i..."
-      sleep 2
-    done
-    echo
-
-  # not called by pia-foss manual-connections scripts so have to pass with file
-    export PIA_TOKEN="${PIA_TOKEN:-$(head -1 /opt/etc/piavpn-manual/token)}"
-  # Couldn't get PIA's working so using modifed one from
-  # https://github.com/thrnz/docker-wireguard-pia/blob/master/extra/pf.sh
-    ./pf.sh > /tmp/pf.log &
+    logger "Place any desired commands  after this line
 
 exit 0
