@@ -43,9 +43,12 @@ check_tool() {
 
 # If the server list has less than 1000 characters, it means curl failed.
 check_all_region_data() {
-  echo
-  echo -n "Getting the server list..."
-
+   # Called from command line not systemd service
+     if [[ -t 0 || -p /dev/stdin ]]
+     then 
+          echo
+          echo -n "Getting the server list..."
+     fi
   if [[ ${#all_region_data} -lt 1000 ]]; then
     echo -e "${red}Could not get correct region data. To debug this, run:"
     echo "$ curl -v $serverlist_url"
@@ -201,24 +204,28 @@ bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
-  echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}"
-  if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then
-    echo " (geolocated region)."
-  else
-    echo "."
-  fi
-  echo -e "
-The script found the best servers from the region you selected.
-When connecting to an IP (no matter which protocol), please verify
-the SSL/TLS certificate actually contains the hostname so that you
-are sure you are connecting to a secure server, validated by the
-PIA authority. Please find below the list of best IPs and matching
-hostnames for each protocol:
-${green}Meta Services $bestServer_meta_IP\t-     $bestServer_meta_hostname
-WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
-OpenVPN TCP   $bestServer_OT_IP\t-     $bestServer_OT_hostname
-OpenVPN UDP   $bestServer_OU_IP\t-     $bestServer_OU_hostname
-${nc}"
+   # Called from command line not systemd service
+     if [[ -t 0 || -p /dev/stdin ]]
+     then 
+          echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}"
+          if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then
+            echo " (geolocated region)."
+          else
+            echo "."
+          fi
+          echo -e "
+        The script found the best servers from the region you selected.
+        When connecting to an IP (no matter which protocol), please verify
+        the SSL/TLS certificate actually contains the hostname so that you
+        are sure you are connecting to a secure server, validated by the
+        PIA authority. Please find below the list of best IPs and matching
+        hostnames for each protocol:
+        ${green}Meta Services $bestServer_meta_IP\t-     $bestServer_meta_hostname
+        WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
+        OpenVPN TCP   $bestServer_OT_IP\t-     $bestServer_OT_hostname
+        OpenVPN UDP   $bestServer_OU_IP\t-     $bestServer_OU_hostname
+        ${nc}"
+     fi
 fi
 
 # The script will check for an authentication token, and use it if present
@@ -236,20 +243,24 @@ if [[ -z $PIA_TOKEN ]]; then
     # dont delete, need this for post_up.sh pf.sh
       #rm -f /opt/etc/piavpn-manual/token
 else
-  echo -e "Using existing token ${green}$PIA_TOKEN${nc}."
+  echo -e "Using existing token ${green}\$PIA_TOKEN${nc}."
   echo
 fi
 
 # Connect with WireGuard and clear authentication token file and latencyList
 if [[ $VPN_PROTOCOL == "wireguard" ]]; then
-  echo "The ./get_region.sh script got started with"
-  echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
-  echo "by running this command:"
-  echo -e "$ ${green}PIA_TOKEN=$PIA_TOKEN \\"
-  echo "WG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\"
-  echo -e "PIA_PF=$PIA_PF ./connect_to_wireguard_with_token.sh${nc}"
-  echo
-  PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
+   # Called from command line not systemd service
+     if [[ -t 0 || -p /dev/stdin ]]
+     then 
+          echo "The ./get_region.sh script got started with"
+          echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
+          echo "by running this command:"
+          echo -e "$ ${green}PIA_TOKEN=$PIA_TOKEN \\"
+          echo "WG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\"
+          echo -e "PIA_PF=$PIA_PF ./connect_to_wireguard_with_token.sh${nc}"
+          echo
+     fi
+    PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
     WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
 
     # keep this file to get PREFERRED_REGION

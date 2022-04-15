@@ -185,16 +185,20 @@ if echo "${DISABLE_IPV6:0:1}" | grep -iq n; then
   echo -e "${red}IPv6 settings have not been altered.
   ${nc}"
 else
-  echo -e "The variable ${green}DISABLE_IPV6=$DISABLE_IPV6${nc}, does not start with 'n' for 'no'.
-${green}Defaulting to yes.${nc}
-"
+   # Called from command line not systemd service
+     if [[ -t 0 || -p /dev/stdin ]]
+     then 
+          echo -e "The variable ${green}DISABLE_IPV6=$DISABLE_IPV6${nc}, does not start with 'n' for 'no'.
+        ${green}Defaulting to yes.${nc}
+        "
+          echo
+          echo -e "${red}IPv6 has been disabled${nc}, you can ${green}enable it again with: "
+          echo "sysctl -w net.ipv6.conf.all.disable_ipv6=0"
+          echo "sysctl -w net.ipv6.conf.default.disable_ipv6=0"
+          echo -e "${nc}"
+     fi
   sysctl -w net.ipv6.conf.all.disable_ipv6=1
   sysctl -w net.ipv6.conf.default.disable_ipv6=1
-  echo
-  echo -e "${red}IPv6 has been disabled${nc}, you can ${green}enable it again with: "
-  echo "sysctl -w net.ipv6.conf.all.disable_ipv6=0"
-  echo "sysctl -w net.ipv6.conf.default.disable_ipv6=0"
-  echo -e "${nc}"
 fi
 
 # Input validation and check for conflicting declarations of AUTOCONNECT and PREFERRED_REGION
@@ -404,10 +408,14 @@ ${nc}"
 # Check for the required presence of resolvconf for setting DNS on wireguard connections
 setDNS="yes"
 if ! command -v resolvconf &>/dev/null && [[ $VPN_PROTOCOL == "wireguard" ]]; then
-  echo -e "${red}The resolvconf package could not be found."
-  echo "This script can not set DNS for you and you will"
-  echo -e "need to invoke DNS protection some other way.${nc}"
-  echo
+   # Called from command line not systemd service
+     if [[ -t 0 || -p /dev/stdin ]]
+     then 
+          echo -e "${red}The resolvconf package could not be found."
+          echo "This script can not set DNS for you and you will"
+          echo -e "need to invoke DNS protection some other way.${nc}"
+          echo
+     fi
   setDNS="no"
   # coreelec does not have resolvconf; however we can still create a new /etc/resolv.conf
      setDNS="yes"

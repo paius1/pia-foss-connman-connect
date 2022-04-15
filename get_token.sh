@@ -86,9 +86,14 @@ echo
 token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token')
 tokenExpiration=$(timeout_timestamp)
 tokenLocation=/opt/etc/piavpn-manual/token
-echo -e "PIA_TOKEN=$token${nc}"
-echo "$token" > "$tokenLocation" || exit 1
-echo "$tokenExpiration" >> "$tokenLocation"
-echo
-echo "This token will expire in 24 hours, on $tokenExpiration."
-echo
+
+   # Called from command line not systemd service
+     if [[ -t 0 || -p /dev/stdin ]]
+     then 
+          echo -e "PIA_TOKEN=$token${nc}"
+     fi
+          echo "$token" > "$tokenLocation"
+          echo "$tokenExpiration" >> "$tokenLocation"
+          echo
+          echo "This token will expire in 24 hours, on $tokenExpiration."
+          echo
