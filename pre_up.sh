@@ -54,12 +54,6 @@
 	EOF
     done
 
-  # stop transmission from running in the wild
-    if grep -q alive < <(/opt/etc/init.d/S88transmission check)
-    then logger "Stopping transmission daemon"
-         /opt/etc/init.d/S88transmission stop >/dev/null
-    fi
-
   # stop portforwarding 
     logger "Stopping port forwarding"
     ps aux|grep '[p]f\.' | awk '{print $2}' | xargs kill >/dev/null 2>&1

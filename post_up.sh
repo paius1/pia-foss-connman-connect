@@ -30,15 +30,7 @@
     cd "${0%/*}" || exit 255
 
   # get PIA_PF
-  # shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/.env
     source .env 2>/dev/null
-
-  # added  --logfile /dev/null to ARGS in init script to avoid spamming journal
-    if ! grep -q alive < <(/opt/etc/init.d/S88transmission check)
-    then logger "Starting transmission daemon"
-         /opt/etc/init.d/S88transmission start
-         sleep 3
-     fi
 
     if [[ $PIA_PF != "true" ]]; then
       echo "If you want to also enable port forwarding, you can start the script:"

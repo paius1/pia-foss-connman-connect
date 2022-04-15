@@ -30,7 +30,6 @@
     cd "${0%/*}" || exit 255
 
   # get $mydns?
-  # shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/.env
     source .env 2>/dev/null
 
   # clear firewall
@@ -50,11 +49,6 @@
     connmanctl disconnect "$(grep VPN < <( connmanctl services) | awk '{print $NF}')"
 
 # add anything else such stopping applications and port forwarding
-  # stop transmission
-    if grep -q alive < <(/opt/etc/init.d/S88transmission check)
-    then logger "Stopping transmission daemon"
-         /opt/etc/init.d/S88transmission stop
-    fi
 
   # stop portforwarding 
     logger "stopping port forward binging"

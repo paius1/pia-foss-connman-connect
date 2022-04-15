@@ -7,8 +7,11 @@ logs
 
 # The file containing environment variables 
 .env
+.auth_token
 
 # BACKUP files
 *-BAK-*
 *.bak
 *~
+# dot files
+.*

@@ -18,7 +18,7 @@ Wants=network-online.target nss-lookup.target connman-vpn.service time-sync.targ
 ;               export CONNMAN_CONNECT='true'
 ;               export mydns=192.168.1.136
 
-ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env
+ConditionFileNotEmpty=/path/to/scripts/.env
 
 [Service]
 Type=oneshot
@@ -30,15 +30,15 @@ Environment="CONNMAN_CONNECT=true"
 ; optional stuff to do before connecting
 ; e.g. stopping existing VPN connection, adjusting firewall, stopping 
 ;      any vpn dependent applications
-ExecStartPre=/storage/sources/pia-wireguard/pre_up.sh
+ExecStartPre=/path/to/scripts/pre_up.sh
 
-ExecStart=/storage/sources/pia-wireguard/run_setup.sh
+ExecStart=/path/to/scripts/run_setup.sh
 
 ; stuff to do after connecting e.g. port forwarding
-ExecStartPost=-/storage/sources/pia-wireguard/post_up.sh
+ExecStartPost=-/path/to/scripts/post_up.sh
 
 ; disconnect from wireguard
-ExecStop=/storage/sources/pia-wireguard/shutdown.sh
+ExecStop=/path/to/scripts/shutdown.sh
 
 [Install]
 WantedBy=multi-user.target
