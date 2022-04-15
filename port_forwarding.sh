@@ -43,6 +43,22 @@ check_tool() {
 check_tool /opt/bin/curl
 check_tool /opt/bin/jq
 
+  # replace any currently running port_forwarding.sh's
+    pids=($(pidof port_forwarding.sh))
+    mypid=$$
+
+    if [ "${#pids[@]}" -gt 1 ]
+    then # remove this instance from pids[@]
+         logger "port_forwarding.sh is already running, will stop others"
+         for i in ${!pids[@]}
+         do
+            if [ "${pids[$i]}" == "$mypid" ]
+            then unset pids[$i]
+            fi
+         done
+         echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1
+    fi
+
 # Check if the mandatory environment variables are set.
 if [[ -z $PF_GATEWAY || -z $PIA_TOKEN || -z $PF_HOSTNAME ]]; then
   echo "This script requires 3 env vars:"
@@ -56,6 +72,12 @@ if [[ -z $PF_GATEWAY || -z $PIA_TOKEN || -z $PF_HOSTNAME ]]; then
   echo "https://github.com/pia-foss/manual-connections"
 exit 1
 fi
+
+  # wait for privateinternetaccess
+    until ping -c 1  -W 1  privateinternetaccess.com > /dev/null 2>&1
+    do logger "wait for privateinternetaccess"
+       sleep 5
+    done
 
 # Check if terminal allows output, if yes, define colors for output
 if [[ -t 1 ]]; then
@@ -82,6 +104,19 @@ fi
     log='/tmp/port_forward.log'
     LOG="${1:-${log}}"
     bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
+
+# An error with no recovery logic occured
+fatal_error () {
+    logger "Fatal error"
+    logger -n "Attempting Restarting port forwarding in "
+          for i in {5..1}; do
+            echo -n "$i..."
+          done
+          echo
+          sleep 15
+    PIA_TOKEN="${PIA_TOKEN}" "$(pwd)/${BASH_SOURCE##*/}" >> /tmp/pf.log &
+    exit 1
+}
 
 # Handle shutdown behavior
 finish () {
@@ -119,8 +154,8 @@ if [[ -z $PAYLOAD_AND_SIGNATURE ]]; then
     #-G --data-urlencode "token=${PIA_TOKEN}" \
     #"https://${PF_HOSTNAME}:19999/getSignature")"
 
-    # MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh
-        payload_and_signature="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "token=${PIA_TOKEN}" --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/getSignature")"  
+        # MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh
+            payload_and_signature="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "token=${PIA_TOKEN}" --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/getSignature")"  
 else
   payload_and_signature=$PAYLOAD_AND_SIGNATURE
   echo -n "Checking the payload_and_signature from the env var... "
@@ -142,19 +177,19 @@ signature=$(echo "$payload_and_signature" | jq -r '.signature')
 # The payload has a base64 format. We need to extract it from the
 # previous response and also get the following information out:
 # - port: This is the port you got access to
-# - expires_at_raw: this is the date+time when the port expires
+# - expires_at: this is the date+time when the port expires
 payload=$(echo "$payload_and_signature" | jq -r '.payload')
 port=$(echo "$payload" | base64 -d | jq -r '.port')
 
 # The port normally expires after 2 months. If you consider
 # 2 months is not enough for your setup, please open a ticket.
-expires_at_raw=$(echo "$payload" | base64 -d | jq -r '.expires_at')
+expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
 
 echo -ne "
 signature=\"$signature\"
 payload=\" $payload\"
 
---> The port is ${green}$port${nc} and it will expire on ${red}$expires_at_raw${nc}. <--
+--> The port is ${green}$port${nc} and it will expire on ${red}$expires_at${nc}. <--
 
 Trying to bind the port... "
 
@@ -170,33 +205,34 @@ while true; do
     #--data-urlencode "signature=${signature}" \
     #"https://${PF_HOSTNAME}:19999/bindPort")"
 
-    # MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh
-            bind_port_response="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "payload=${payload}" --data-urlencode "signature=${signature}"  --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/bindPort" )"
-
-    echo -e "${green}OK!${nc}"
+        # MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh
+                bind_port_response="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "payload=${payload}" --data-urlencode "signature=${signature}"  --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/bindPort" )"
 
     # If port did not bind, just exit the script.
     # This script will exit in 2 months, since the port will expire.
-    export bind_port_response
     if [[ $(echo "$bind_port_response" | jq -r '.status') != "OK" ]]; then
       echo -e "${red}The API did not return OK when trying to bind port... Exiting.${nc}"
-      exit 1
+      fatal_error
     fi
+    export bind_port_response
+
+    echo -e "${green}OK!${nc}"
     logger "Forwarded port        $port"
     logger "Refreshed at          $(date)"
     logger "Expires at            $(date --date="$expires_at")"
     logger  "This script will need to remain active to use port forwarding, and will refresh every 15 minutes."
       # send Forwarding port to journal  
->&2 echo "Forwarding on port=\"${port}\""
+        echo "                          Forwarding on port=\"${port}\""
 
-        # Dump port here if requested
+        # Dump port to file if requested
           [ -n "$portfile" ] && { echo "${port}" > "$portfile" && \
                                   logger "Port dumped to $portfile"; }
 
-      # add port to iptables
-        logger "adding peer port ${port} to firewall"
-        iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
+        # add port to iptables
+          logger "adding peer port ${port} to firewall"
+          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
 
     # sleep 15 minutes
     sleep 900
+           logger "Rebinding to peer port ${port}"
 done
