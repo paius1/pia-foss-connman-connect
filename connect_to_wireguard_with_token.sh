@@ -148,13 +148,15 @@ fi
   # THIS IS WHERE WE CONNECT and since wg-quick doesn't work
   # we convert wireguard.conf to a connman config
 
-echo -n "Trying to write /etc/wireguard/pia.conf..."
+echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
 mkdir -p /opt/etc/wireguard
 echo "
 [Interface]
 Address = $(echo "$wireguard_json" | /opt/bin/jq -r '.peer_ip')
 PrivateKey = $privKey
+ListenPort = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_port')
 $dnsSettingForVPN
+
 [Peer]
 PersistentKeepalive = 25
 PublicKey = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_key')
