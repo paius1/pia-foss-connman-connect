@@ -15,6 +15,8 @@
        exit 1; }
   [[ "$1" =~ ^[-hH] ]] && _Usage "$@"
 
+  # PIA's scripts are set to a relative path
+    cd "${0%/*}"
   
   # check for entware and intalled packages
     if [ -f /storage/.opt/bin/opkg ]

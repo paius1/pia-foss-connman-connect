@@ -26,6 +26,7 @@ check_tool() {
   if ! command -v "$cmd" >/dev/null; then
     echo "$cmd could not be found"
     echo "Please install $cmd"
+    echo "Try running $(pwd)/entware-installer.sh "
     exit 1
   fi
 }
