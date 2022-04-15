@@ -32,8 +32,8 @@ check_tool() {
 
 # wg-quick doesn't seem to work with coreelec
 #check_tool wg-quick
-check_tool curl
-check_tool jq
+    check_tool /opt/bin/curl
+    check_tool /opt/bin/jq
 
 # Check if terminal allows output, if yes, define colors for output
 if [[ -t 1 ]]; then

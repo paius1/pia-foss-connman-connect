@@ -46,9 +46,8 @@
     Starting port forwarding in "
     for i in {5..1}; do
       echo -n "$i..."
-      sleep 1
+      sleep 2
     done
-    echo
     echo
 
   # not called by pia-foss manual-connections scripts so have to pass with file

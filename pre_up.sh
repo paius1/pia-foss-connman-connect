@@ -30,8 +30,6 @@
     cd "${0%/*}" || exit 255
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
-#logger "This script starts applications after connection"
-#exit 0
 
   # stop any VPN's previously started
     logger "Stopping any existing VPN"
