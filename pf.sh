@@ -30,10 +30,27 @@
   # where to store the port number for later usage
     portfile='/tmp/port.dat'
 
+  # stop any previous instances of pf.sh
+    pids=($(pidof pf.sh))
+    mypid=$$
+echo "number of pf.sh pids ${#pids[@]}"
+    if [ "${#pids[@]}" -gt 1 ]
+    then # remove this instance from pids
+         for i in ${!pids[@]}
+         do
+            if [ "${pids[$i]}" == "$mypid" ]
+            then unset pids[$i]
+            fi
+         done
+         echo "${pids[@]}" | xargs kill >/dev/null 2>&1
+    fi
+
 # An error with no recovery logic occured
 fatal_error () {
   cleanup
   echo "$(date): Fatal error"
+  echo "$(date): Attempting Restarting"
+  PIA_TOKEN="${PIA_TOKEN}" "$(pwd)/${BASH_SOURCE##*/}" >> /tmp/pf.log &
   exit 1
 }
 
@@ -55,7 +72,6 @@ trap finish SIGTERM SIGINT SIGQUIT
     curl_retry_delay=15
 
   # Check if the mandatory environment variables are set.
-    #if [[ ! $PF_GATEWAY || ! $PIA_TOKEN || ! $PF_HOSTNAME ]]; then
     if [[ ! $PIA_TOKEN ]]; then
       echo This script requires:
       echo PIA_TOKEN   - the token you used to connect to the vpn services

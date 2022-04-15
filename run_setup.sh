@@ -170,6 +170,7 @@ echo
 
     # Wireguard and ipv6 are not supported
       export DISABLE_IPV6=true
+
 # Check for in-line definition of DISABLE_IPV6 and prompt for input
 if [[ -z $DISABLE_IPV6 ]]; then
   echo "Having active IPv6 connections might compromise security by allowing"

@@ -186,7 +186,7 @@ echo -e "${green}OK!${nc}"
 	EOF
 
     # I placed this here for interactive use of these scripts
-    if [[ "${CONNMAN_CONNECT}" != "true" ]]
+    if [[ "${CONNMAN_CONNECT}" != "true" ]] || [[ "${AUTOCONNECT}" != "true" ]]
     then
          echo "CONNMAN service ${SERVICE}! is ready"
          echo -n "Do you wish to connect now([Y]es/[n]o): "
@@ -231,11 +231,12 @@ sleep 2
         done
         echo
         echo
-        
-            echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh"
-            
-            PIA_TOKEN=$PIA_TOKEN \
-              ./pf.sh &
+
+        echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh"
+        echo "logging to /tmp/pf.log"
+
+        PIA_TOKEN=$PIA_TOKEN \
+          ./pf.sh  > /tmp/pf.log &
     fi
 #########
  exit 0 #
