@@ -1,6 +1,6 @@
-# Manual PIA VPN Connections for Connman
+# Manual PIA VPN Connections for Connman/coreELEC
 
-This repository take the scripts from https://github.com/pia-foss/manual-connections (slightly modified) and uses them to create a valid connman vpn config file __TL/DR__:
+This repository take the scripts from https://github.com/pia-foss/manual-connections (slightly modified) and uses them to create a valid connman vpn config file for use with coreelec __TL/DR__:
 
 ```
 git clone https://github.com/pia-foss/manual-connections.git
