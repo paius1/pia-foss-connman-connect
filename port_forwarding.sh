@@ -107,7 +107,9 @@ fi
 
 # An error with no recovery logic occured
 fatal_error () {
+    local port="${1}"
     logger "Fatal error"
+    iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT
     logger -n "Attempting Restarting port forwarding in "
           for i in {5..1}; do
             echo -n "$i..."
@@ -124,6 +126,14 @@ finish () {
   exit 0
 }
 trap finish SIGTERM SIGINT SIGQUIT
+
+        Starting port forwarding in "
+        for i in {3..1}; do
+          echo -n "$i..."
+          sleep 1
+        done
+        echo
+        echo
 
 # The port forwarding system has required two variables:
 # PAYLOAD: contains the token, the port and the expiration date
@@ -186,12 +196,25 @@ port=$(echo "$payload" | base64 -d | jq -r '.port')
 expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
 
 echo -ne "
-signature=\"$signature\"
-payload=\" $payload\"
-
 --> The port is ${green}$port${nc} and it will expire on ${red}$expires_at${nc}. <--
 
 Trying to bind the port... "
+
+
+        # Dump port to file if requested
+          [ -n "$portfile" ] && { echo "${port}" > "$portfile" && \
+                                  logger "Port dumped to $portfile"; }
+        # add port to iptables
+          logger "adding peer port ${port} to firewall"
+          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
+
+        # Send port forwarding to transmission
+          if [[ "${port}" =~ ^[0-9]+$ ]] && grep -q alive < <(/opt/etc/init.d/S88transmission check)
+          then
+             logger "adding peer port ${port} to transmission settings"
+             transmission-remote localhost:9091 --auth=root:password  -p "${port}" >/dev/null 2>&1
+          fi
+>&2        echo "                          Forwarding on port=\"${port}\""
 
 # Now we have all required data to create a request to bind the port.
 # We will repeat this request every 15 minutes, in order to keep the port
@@ -212,7 +235,7 @@ while true; do
     # This script will exit in 2 months, since the port will expire.
     if [[ $(echo "$bind_port_response" | jq -r '.status') != "OK" ]]; then
       echo -e "${red}The API did not return OK when trying to bind port... Exiting.${nc}"
-      fatal_error
+      fatal_error "${port}"
     fi
     export bind_port_response
 
@@ -223,14 +246,6 @@ while true; do
     logger  "This script will need to remain active to use port forwarding, and will refresh every 15 minutes."
       # send Forwarding port to journal  
         echo "                          Forwarding on port=\"${port}\""
-
-        # Dump port to file if requested
-          [ -n "$portfile" ] && { echo "${port}" > "$portfile" && \
-                                  logger "Port dumped to $portfile"; }
-
-        # add port to iptables
-          logger "adding peer port ${port} to firewall"
-          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
 
     # sleep 15 minutes
     sleep 900

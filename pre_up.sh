@@ -52,6 +52,10 @@
 	EOF
     done
 
+  # if fresh start wait for things to settle down
+    [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 20 ]] \
+    && sleep 5
+
   # stop portforwarding 
     logger "Stopping port forwarding"
     ps aux|grep [p]ort_forward | awk '{print $2}' | xargs kill >/dev/null 2>&1

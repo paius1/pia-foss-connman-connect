@@ -234,15 +234,6 @@ sleep 2
       exit 1
     fi
 
-     echo -ne "This script got started with PIA_PF=true.
-        Starting port forwarding in "
-        for i in {5..1}; do
-          echo -n "$i..."
-          sleep 1
-        done
-        echo
-        echo
-
    # Called from command line not systemd service
      if [[ -t 0 || -p /dev/stdin ]]
      then 
