@@ -48,7 +48,7 @@
     if [ -z "${MY_FIREWALL}" ] && [ -f /tmp/my_firewall.v4 ]
     then MY_FIREWALL='/tmp/my_firewall.v4'
     fi
-    iptables-restore < ${MY_FIREWALL:-openrules.v4}
+    iptables-restore < "${MY_FIREWALL:-openrules.v4}"
 
   # restore a sane DNS
     logger "restoring sane nameservers"
@@ -62,7 +62,6 @@ EOF
     fi
 
   # stop port forwarding 
-    logger "stopping port forwarding"
     pf_pids=($(pidof port_forwarding.sh))
     if [ "${#pf_pids[@]}" -ne 0 ]
     then logger "Stopping port forwarding"

@@ -34,11 +34,10 @@
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
 
   # on SYSTEM START wait for things to settle down
-  # and save a copy of /etc/resolv.conf and the current iptables
-    if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 20 ]]
+  # and save a copy of /etc/resolv.conf
+    if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]]
     then sleep 5
          cp /etc/resolv.conf /storage/.cache/starting_resolv.conf
-         iptables-save > /tmp/my_firewall.v4
     fi
 
   # stop any VPN's previously started

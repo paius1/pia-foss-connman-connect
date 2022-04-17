@@ -239,17 +239,21 @@ while true; do
       fatal_error "${port}"
     fi
     export bind_port_response
->&2    echo -e "${green}OK!${nc}"
->&2    echo
+>&2    echo -e "${green}OK!${nc}" #
+>&2    echo #
 
-    logger "Forwarded port        $port"
-    logger "Refreshed at          $(date)"
-    logger "Expires at            $(date --date="$expires_at")"
-    logger  "This script will need to remain active to use port forwarding, and will refresh every 15 minutes."
+    if [ -z "${pf_firstrun}" ]
+    then ((pf_firstrun))
+         logger "Forwarded port        $port" #
+         logger "Refreshed at          $(date)"
+         logger "Expires at            $(date --date="$expires_at")" #
+         logger  "$(pwd)/${BASH_SOURCE##*/} will need to remain active to use port forwarding, and will refresh every 15 minutes." #
+    else logger "Rebinding to peer port ${port}" #
+    fi #
       # send Forwarding port to journal  
 #        echo "                          Forwarding on port=\"${port}\""
 
     # sleep 15 minutes
     sleep 900
-           logger "Rebinding to peer port ${port}"
+
 done

@@ -123,6 +123,8 @@ printServerLatency() {
 
   regionName="$(echo "${@:3}" |
     sed 's/ false//' | sed 's/true/(geo)/')"
+        REGION="$(awk '{print $2}' <<< "${@:1}")" #
+
   time=$(LC_NUMERIC=en_US.utf8 curl -o /dev/null -s \
     --connect-timeout "$connect_timeout" \
     --write-out "%{time_connect}" \
@@ -133,7 +135,7 @@ printServerLatency() {
             if awk "BEGIN {exit !($MAX_LATENCY >= $time)}" #
             then #
 
-    >&2 echo "Got latency ${time}s <= ${MAX_LATENCY} for region: $regionName"
+>&2 echo "Got latency ${time}s for PREFERRED_REGION='${REGION}'" #
     echo "$time $regionID $serverIP"
     # Write a list of servers with acceptable latency
     # to /opt/etc/piavpn-manual/latencyList
@@ -216,6 +218,7 @@ bestServer_OT_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].ip')
 bestServer_OT_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].cn')
 bestServer_OU_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].ip')
 bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].cn')
+    bestServer_region=$(echo "$regionData" | /opt/bin/jq -r '.id') #
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
@@ -235,6 +238,7 @@ the SSL/TLS certificate actually contains the hostname so that you
 are sure you are connecting to a secure server, validated by the
 PIA authority. Please find below the list of best IPs and matching
 hostnames for each protocol:
+          set PREFERRED_REGION='${bestServer_region}'
 ${green}Meta Services $bestServer_meta_IP\t-     $bestServer_meta_hostname
 WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
 OpenVPN TCP   $bestServer_OT_IP\t-     $bestServer_OT_hostname

@@ -41,12 +41,11 @@
       #   PIA_PASS='p45sw0rdxx'
       #   PIA_PF='true|false'
       #   PIA_DNS='true|false'
-      #   PREFERRED_REGION= [ run ./get_region and awk '{print $2}' /opt/etc/piavpn-manual/latencyList ]
+      #   PREFERRED_REGION= [ run PIA_PF=(true|false) ./get_region ]
       # or
       #   AUTOCONNECT='true|false' n.b. AUTOCONNECT='true' overrides PREFERRED_REGION
-      #  AUTOCONNECT takes precedence over PREFERRED_REGION
-      #  however it must run through all available servers
-      #  which means it takes a long... long... time
+      #   and it must run through all available servers
+      #   which means it takes a long... long... time
     # optional n.b. these variable are not included in the pia scripts
     #               so they must be exported
       #   export CONNMAN_CONNECT='true' n.b. this is set in the service unit
