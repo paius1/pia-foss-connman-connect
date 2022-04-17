@@ -231,19 +231,14 @@ if [[ $VPN_PROTOCOL == "no" ]]; then
   else
     echo "."
   fi
+    # changed this monologue to only output WireGuard #
   echo -e "
-The script found the best servers from the region you selected.
-When connecting to an IP (no matter which protocol), please verify
-the SSL/TLS certificate actually contains the hostname so that you
-are sure you are connecting to a secure server, validated by the
-PIA authority. Please find below the list of best IPs and matching
-hostnames for each protocol:
-          set PREFERRED_REGION='${bestServer_region}'
-${green}Meta Services $bestServer_meta_IP\t-     $bestServer_meta_hostname
-WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
-OpenVPN TCP   $bestServer_OT_IP\t-     $bestServer_OT_hostname
-OpenVPN UDP   $bestServer_OU_IP\t-     $bestServer_OU_hostname
-${nc}"
+The script found the best server from the region you selected.
+and port forwarding = ${PIA_PF}:
+
+${green}WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
+   PREFERRED_REGION='${bestServer_region}'
+"
      fi #
 fi
 
