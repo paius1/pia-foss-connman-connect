@@ -15,28 +15,29 @@ to run as a service you need:
 
   Predefined variables for the pia-foss manual connections scripts
   saved to:  /path/to/these/scripts/.env
-  without these the pia-foss/manual-connections scripts run interactively
-  and the unit will fail
+  Without these the scripts run interactively and the unit will fail.
  
-  minimum file
+# minimum file
                PIA_USER=pXXXXXXX
                PIA_PASS=p45sw0rdxx
                PIA_PF='true|false'
                PIA_DNS='true|false'
-               AUTOCONNECT='false' # if this is set 'true' PREFERRED_REGION is ignored
-                                   # the script must run through all available servers
-                      # OR         # which takes a long... long... time
+               AUTOCONNECT='false' # if set 'true' PREFERRED_REGION is ignored
+                                   # and the script must run thru all available servers
+                      # OR         # and takes a long... long... time
                PREFERRED_REGION='aus_perth'
-                                # [PIA_PF='true|false' /path/to/scripts/get_region.sh]
+                                # run PIA_PF='true|false' /path/to/scripts/get_region.sh
                                 # for valid options
-  optional: these are not part of pia-foss, and must be exported
-               export CONNMAN_CONNECT='true' overcomes AUTOCONNECT's limitation,
-                                             and set in service unit
-               export MY_FIREWALL=/path/to/normal/iptables-save.file
-               export WG_FIREWALL=/path/to/wireguard/iptables-save.file
+# optional: these are not part of pia-foss, and must be exported
+               #export CONNMAN_CONNECT='true' # overcomes AUTOCONNECT's limitation,
+                                             # and is set in service unit
+               #export MY_FIREWALL=/path/to/normal/iptables-save.file
+               #export WG_FIREWALL=/path/to/wireguard/iptables-save.file
                
-  Edit service file and replace /path/to/scripts with your actual path to scripts
-  Edit pre_up.sh post_up.sh and shutdown.sh to suit your needs.
+  Edit: service file Replace /path/to/scripts with the actual path to scripts
+  Edit pre_up.sh , e.g. stop vpn dependent applications (transmission anyone)
+       post_up.sh
+       shutdown.sh
   
   Copy pia-wireguard.service to /storage/.config/system.d/
     systemctl daemon-reload
@@ -46,6 +47,13 @@ to run as a service you need:
     journactl -f -u pia-wireguard.service
 
 ```
+```
+  To run from kodi Favourites: from /path/2/pia-foss-connman-connect/kodi_assets/
+                               copy the xml in add_to_favourites.xml to ~/.kodi/userdate/favourites.xml
+                               changing the paths to the scripts and thumbnails i.e. .png files
+                               reload your favourites, and enjoy.
+```
+
 
 
 FROM PIA-FOSS MANUAL-CONNECTIONS:
