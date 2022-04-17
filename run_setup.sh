@@ -36,22 +36,22 @@
     [ -f .env ] && source .env #
 
   # possible variables for .env
-    # required for systemd service
+    # required: for systemd service
       #   PIA_USER='pXXXXXXX'
       #   PIA_PASS='p45sw0rdxx'
       #   PIA_PF='true|false'
       #   PIA_DNS='true|false'
       #   PREFERRED_REGION= [ run PIA_PF=(true|false) ./get_region ]
-      # or
+      # OR
       #   AUTOCONNECT='true|false' n.b. AUTOCONNECT='true' overrides PREFERRED_REGION
       #   and it must run through all available servers
       #   which means it takes a long... long... time
-    # optional n.b. these variable are not included in the pia scripts
-    #               so they must be exported
+    # optional: these variable are not included in the pia scripts
+    #               THEY MUST BE EXPORTED
       #   export CONNMAN_CONNECT='true' n.b. this is set in the service unit
     # if you want to use a custom set of iptables rules then define them here
-      #   export MY_FIREWALL=/storage/.config/iptables/openrules.v4
-      #   export WG_FIREWALL=/storage/.config/iptables/openrules.v4
+      #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4
+      #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4
 
   # setup sane environment PRE_UP_RUN is set in systemd unit file
     if [ -z "${PRE_UP_RUN}" ] #
