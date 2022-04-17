@@ -23,12 +23,15 @@ to run as a service you need:
                PIA_PASS=p45sw0rdxx
                PIA_PF='true|false'
                PIA_DNS='true|false'
-               AUTOCONNECT='false'  if this is set 'true' PREFERRED_REGION is ignored
-                                    the script must must run through all available servers
-                                    which takes a long... long... time
-               PREFERRED_REGION=[ PIA_PF='true|false' /path/to/scripts/get_region.sh, for valid options ]
+               AUTOCONNECT='false' # if this is set 'true' PREFERRED_REGION is ignored
+                                   # the script must run through all available servers
+                      # OR         # which takes a long... long... time
+               PREFERRED_REGION='aus_perth'
+                                # [PIA_PF='true|false' /path/to/scripts/get_region.sh]
+                                # for valid options
   optional: these are not part of pia-foss, and must be exported
-               export CONNMAN_CONNECT='true' overcomes AUTOCONNECT's limit, and set in service unit 
+               export CONNMAN_CONNECT='true' overcomes AUTOCONNECT's limitation,
+                                             and set in service unit
                export MY_FIREWALL=/path/to/normal/iptables-save.file
                export WG_FIREWALL=/path/to/wireguard/iptables-save.file
                
