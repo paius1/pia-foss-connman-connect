@@ -1,6 +1,6 @@
 <favourites>
 <!--Add from here to EOF to  /storage/.kodi/userdata/favourites.xml-->
-    <favourite name="Pia-Wireguard Connect" thumb="/path/to/pia_512x512.png">System.Exec(/storage/sources/pia-foss-connman-connect/run_setup.sh)</favourite>
-    <favourite name="Pia-Wireguard Disconnect" thumb="/path/to/pia_off_512x512.png">System.Exec(/storage/sources/pia-foss-connman-connect/shutdown.sh)</favourite>
+    <favourite name="Pia-Wireguard Connect" thumb="/path/to/pia_512x512.png">System.Exec(/path/to/run_setup.sh)</favourite>
+    <favourite name="Pia-Wireguard Disconnect" thumb="/path/to/pia_off_512x512.png">System.Exec(/path/to/shutdown.sh)</favourite>
 <!--EOF-->
 </favourites>
