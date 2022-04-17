@@ -21,15 +21,17 @@ to run as a service you need:
   minimum file
                PIA_USER=pXXXXXXX
                PIA_PASS=p45sw0rdxx
-               AUTOCONNECT='false'  if this is set 'true' PREFERRED_REGION is ignored
-               PREFERRED_REGION=someregion from /opt/etc/piavpn-manual/latencyList e.g. ca_toronto
-               VPN_PROTOCOL=wireguard
                PIA_PF='true|false'
                PIA_DNS='true|false'
-  optional:
-               export CONNMAN_CONNECT='true'
-               export mydns=192.168.1.136
-
+               AUTOCONNECT='false'  if this is set 'true' PREFERRED_REGION is ignored
+                                    the script must must run through all available servers
+                                    which takes a long... long... time
+               PREFERRED_REGION=[ PIA_PF='true|false' /path/to/scripts/get_region.sh, for valid options ]
+  optional: these are not part of pia-foss, and must be exported
+               export CONNMAN_CONNECT='true' overcomes AUTOCONNECT's limit, and set in service unit 
+               export MY_FIREWALL=/path/to/normal/iptables-save.file
+               export WG_FIREWALL=/path/to/wireguard/iptables-save.file
+               
   Edit service file and replace /path/to/scripts with your actual path to scripts
   Edit pre_up.sh post_up.sh and shutdown.sh to suit your needs.
   
