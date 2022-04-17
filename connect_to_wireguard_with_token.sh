@@ -200,7 +200,9 @@ sleep 2 #
            fi
          iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}" #
 # print iptables to journal for debugging
-iptables -L
+if [[ ! -t 0 && ! -p /dev/stdin ]]
+then iptables -L
+fi
 #         iptables-restore < rules-wireguard.v4 #
          echo "" #
          if [[ $PIA_DNS == "true" ]] #
