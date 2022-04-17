@@ -26,13 +26,15 @@ check_tool() {
   if ! command -v "$cmd" >/dev/null; then
     echo "$cmd could not be found"
     echo "Please install $cmd"
-    echo "Try running $(pwd)/entware-installer.sh "
+    echo "Try running $(pwd)/entware-installer.sh " #
+    echo "to install all dependencies " #
     exit 1
   fi
 }
 # Now we call the function to make sure we can use curl and jq.
-    check_tool /opt/bin/curl
-    check_tool /opt/bin/jq
+# hard coded path #
+    check_tool /opt/bin/curl #
+    check_tool /opt/bin/jq #
 
 # This function creates a timestamp, to use for setting $TOKEN_EXPIRATION
 timeout_timestamp() {
@@ -58,8 +60,8 @@ if (( EUID != 0 )); then
   echo -e "${red}This script needs to be run as root. Try again with 'sudo $0'${nc}"
   exit 1
 fi
-
-mkdir -p /opt/etc/piavpn-manual
+  # changed path #
+    mkdir -p /opt/etc/piavpn-manual #
 
 if [[ -z $PIA_USER || -z $PIA_PASS ]]; then
   echo "If you want this script to automatically get a token from the Meta"
@@ -87,13 +89,13 @@ token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token')
 tokenExpiration=$(timeout_timestamp)
 tokenLocation=/opt/etc/piavpn-manual/token
 
-   # Called from command line not systemd service
-     if [[ -t 0 || -p /dev/stdin ]]
-     then 
+   # Called from command line not systemd service #
+     if [[ -t 0 || -p /dev/stdin ]] #
+     then #
           echo -e "PIA_TOKEN=$token${nc}"
-     fi
-          echo "$token" > "$tokenLocation"
-          echo "$tokenExpiration" >> "$tokenLocation"
-          echo
-          echo "This token will expire in 24 hours, on $tokenExpiration."
-          echo
+          echo #
+          echo "This token will expire in 24 hours, on $tokenExpiration." #
+          echo #
+     fi #
+          echo "$token" > "$tokenLocation" #
+          echo "$tokenExpiration" >> "$tokenLocation" #

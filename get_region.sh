@@ -20,13 +20,10 @@
 # SOFTWARE.
 # modified for coreELEC/connman plgroves gmail 2022
 
-  # PIA's scripts are set to a relative path
-    cd "${0%/*}"
+  # PIA's scripts are set to a relative path #
+    cd "${0%/*}" #
 
-    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
-
-# MAX_LATENCY below 1 just don't seem to work
-MAX_LATENCY="${MAX_LATENCY:-1}"
+    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
 # This function allows you to check if the required tools have been installed.
 check_tool() {
@@ -34,21 +31,23 @@ check_tool() {
   if ! command -v "$cmd" >/dev/null; then
     echo "$cmd could not be found"
     echo "Please install $cmd"
+    echo "Try running $(pwd)/entware-installer.sh " #
+    echo "to install all dependencies " #
     exit 1
   fi
 }
 # Now we call the function to make sure we can use curl and jq.
-    check_tool /opt/bin/curl
-    check_tool /opt/bin/jq
+# hard coded paths #
+    check_tool /opt/bin/curl #
+    check_tool /opt/bin/jq #
 
 # If the server list has less than 1000 characters, it means curl failed.
 check_all_region_data() {
-   # Called from command line not systemd service
-     if [[ -t 0 || -p /dev/stdin ]]
-     then 
-          echo
-          echo -n "Getting the server list..."
-     fi
+       # Called from command line not systemd service #
+         if [[ -t 0 || -p /dev/stdin ]]; then #
+    echo
+    echo -n "Getting the server list..."
+         fi #
   if [[ ${#all_region_data} -lt 1000 ]]; then
     echo -e "${red}Could not get correct region data. To debug this, run:"
     echo "$ curl -v $serverlist_url"
@@ -57,8 +56,11 @@ check_all_region_data() {
   fi
 
   # Notify the user that we got the server list.
+       # Called from command line not systemd service #
+         if [[ -t 0 || -p /dev/stdin ]]; then #
   echo -e "${green}OK!${nc}
   "
+         fi #
 }
 
 # Get all data for the selected region
@@ -94,10 +96,11 @@ if (( EUID != 0 )); then
   exit 1
 fi
 
-mkdir -p /opt/etc/piavpn-manual
+  # changed the path #
+    mkdir -p /opt/etc/piavpn-manual #
 # Erase old latencyList file
-rm -f /opt/etc/piavpn-manual/latencyList
-touch /opt/etc/piavpn-manual/latencyList
+    rm -f /opt/etc/piavpn-manual/latencyList #
+    touch /opt/etc/piavpn-manual/latencyList #
 
 # This allows you to set the maximum allowed latency in seconds.
 # All servers that respond slower than this will be ignored.
@@ -114,18 +117,30 @@ serverlist_url='https://serverlist.piaservers.net/vpninfo/servers/v6'
 printServerLatency() {
   serverIP=$1
   regionID=$2
+
+        # increased connect-timeout by 1 to get any no 0 replies #
+          local connect_timeout=$(echo $MAX_LATENCY 1 | awk '{print $1 + $2}') #
+
   regionName="$(echo "${@:3}" |
     sed 's/ false//' | sed 's/true/(geo)/')"
   time=$(LC_NUMERIC=en_US.utf8 curl -o /dev/null -s \
-    --connect-timeout "$MAX_LATENCY" \
+    --connect-timeout "$connect_timeout" \
     --write-out "%{time_connect}" \
     "http://$serverIP:443")
-  if [[ $? -eq 0 ]]; then
-    >&2 echo "Got latency ${time}s for region: $regionName"
+  if [[ $? -eq 0 ]]; then # successful connection
+
+            # compare time to MAX_LATENCY #
+            if awk "BEGIN {exit !($MAX_LATENCY >= $time)}" #
+            then #
+
+    >&2 echo "Got latency ${time}s <= ${MAX_LATENCY} for region: $regionName"
     echo "$time $regionID $serverIP"
     # Write a list of servers with acceptable latency
     # to /opt/etc/piavpn-manual/latencyList
     echo -e "$time" "$regionID"'\t'"$serverIP"'\t'"$regionName" >> /opt/etc/piavpn-manual/latencyList
+
+            fi #
+
   fi
   # Sort the latencyList, ordered by latency
   sort -no /opt/etc/piavpn-manual/latencyList /opt/etc/piavpn-manual/latencyList
@@ -183,7 +198,7 @@ if [[ $selectedRegion == "none" ]]; then
     exit 1
   else
     echo -e "A list of servers and connection details, ordered by latency can be
-found in at : ${green}/opt/piavpn-manual/latencyList${nc}
+found in at : ${green}/opt/etc/piavpn-manual/latencyList${nc}
 "
   fi
 else
@@ -204,28 +219,28 @@ bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
-   # Called from command line not systemd service
-     if [[ -t 0 || -p /dev/stdin ]]
-     then 
-          echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}"
-          if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then
-            echo " (geolocated region)."
-          else
-            echo "."
-          fi
-          echo -e "
-        The script found the best servers from the region you selected.
-        When connecting to an IP (no matter which protocol), please verify
-        the SSL/TLS certificate actually contains the hostname so that you
-        are sure you are connecting to a secure server, validated by the
-        PIA authority. Please find below the list of best IPs and matching
-        hostnames for each protocol:
-        ${green}Meta Services $bestServer_meta_IP\t-     $bestServer_meta_hostname
-        WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
-        OpenVPN TCP   $bestServer_OT_IP\t-     $bestServer_OT_hostname
-        OpenVPN UDP   $bestServer_OU_IP\t-     $bestServer_OU_hostname
-        ${nc}"
-     fi
+   # Called from command line not systemd service #
+     if [[ -t 0 || -p /dev/stdin ]] #
+     then #
+  echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}"
+  if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then
+    echo " (geolocated region)."
+  else
+    echo "."
+  fi
+  echo -e "
+The script found the best servers from the region you selected.
+When connecting to an IP (no matter which protocol), please verify
+the SSL/TLS certificate actually contains the hostname so that you
+are sure you are connecting to a secure server, validated by the
+PIA authority. Please find below the list of best IPs and matching
+hostnames for each protocol:
+${green}Meta Services $bestServer_meta_IP\t-     $bestServer_meta_hostname
+WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
+OpenVPN TCP   $bestServer_OT_IP\t-     $bestServer_OT_hostname
+OpenVPN UDP   $bestServer_OU_IP\t-     $bestServer_OU_hostname
+${nc}"
+     fi #
 fi
 
 # The script will check for an authentication token, and use it if present
@@ -238,10 +253,9 @@ if [[ -z $PIA_TOKEN ]]; then
     exit 0
   fi
   ./get_token.sh
-  PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token )
+  PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token ) #
   export PIA_TOKEN
-    # dont delete, need this for post_up.sh pf.sh
-      #rm -f /opt/etc/piavpn-manual/token
+  rm -f /opt/etc/piavpn-manual/token
 else
   echo -e "Using existing token ${green}\$PIA_TOKEN${nc}."
   echo
@@ -250,21 +264,21 @@ fi
 # Connect with WireGuard and clear authentication token file and latencyList
 if [[ $VPN_PROTOCOL == "wireguard" ]]; then
    # Called from command line not systemd service
-     if [[ -t 0 || -p /dev/stdin ]]
-     then 
-          echo "The ./get_region.sh script got started with"
-          echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
-          echo "by running this command:"
-          echo -e "$ ${green}PIA_TOKEN=$PIA_TOKEN \\"
-          echo "WG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\"
-          echo -e "PIA_PF=$PIA_PF ./connect_to_wireguard_with_token.sh${nc}"
-          echo
-     fi
-    PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
-    WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
+     if [[ -t 0 || -p /dev/stdin ]] #
+     then #
+  echo "The ./get_region.sh script got started with"
+  echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
+  echo "by running this command:"
+  echo -e "$ ${green}PIA_TOKEN=$PIA_TOKEN \\"
+  echo "WG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\"
+  echo -e "PIA_PF=$PIA_PF ./connect_to_wireguard_with_token.sh${nc}"
+  echo
+     fi #
+  PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
+  WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
 
-    # keep this file to get PREFERRED_REGION
-      #rm -f /opt/etc/piavpn-manual/latencyList
+    # keep this file to get PREFERRED_REGION #
+      #rm -f /opt/etc/piavpn-manual/latencyList #
   exit 0
 fi
 
