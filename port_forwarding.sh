@@ -53,7 +53,7 @@ check_tool() {
     if [ "${#pids[@]}" -gt 1 ] #
     then # remove this instance from pids[@] #
          logger "port_forwarding.sh is already running, will stop others" #
-         for i in ${!pids[@]} #
+         for i in "${!pids[@]}" #
          do #
             if [ "${pids[$i]}" == "$mypid" ] #
             then unset pids[$i] #

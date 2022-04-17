@@ -135,7 +135,7 @@ printServerLatency() {
             if awk "BEGIN {exit !($MAX_LATENCY >= $time)}" #
             then #
 
->&2 echo "Got latency ${time}s for PREFERRED_REGION='${REGION}'" #
+>&2 echo "Got latency ${time}s for PREFERRED_REGION='${REGION}' ${regionName}" #
     echo "$time $regionID $serverIP"
     # Write a list of servers with acceptable latency
     # to /opt/etc/piavpn-manual/latencyList

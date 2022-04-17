@@ -28,6 +28,6 @@
 
   # PIA's scripts are set to a relative path
     cd "${0%/*}" || exit 255
-    logger "Place any desired commands  after this line
+    logger "Place any desired commands  after this line"
 
 exit 0

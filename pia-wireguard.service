@@ -11,13 +11,16 @@ Wants=network-online.target nss-lookup.target connman-vpn.service time-sync.targ
 ;               PIA_PASS=p45sw0rdxx
 ;               PIA_PF='true|false'
 ;               PIA_DNS='true|false'
-;               AUTOCONNECT='false'  # if set true PREFERRED_REGION is ignored
-;                                    # and takes a long... long... time
+;               AUTOCONNECT='false' # if set true PREFERRED_REGION is ignored
+;                                   # the script must run through all available servers
+;                                   # and takes a long... long... time
 ;               PREFERRED_REGION='aus_perth'
 ;               # PIA_PF=(true|false) /path/to/get_region.sh 2>/dev/null | grep PREFERRED_REGION
 ;
 ; optional: these are not part of pia-foss, and must be exported
-;               export CONNMAN_CONNECT='true'
+;               export CONNMAN_CONNECT='true' # overcomes AUTOCONNECT's limitation,
+;                                              # is set in service unit
+;             # roll your own firewall   
 ;               export MY_FIREWALL=/path/to/normal/iptables-save.file
 ;               export WG_FIREWALL=/path/to/wireguard/iptables-save.file
   minimum file
@@ -26,7 +29,6 @@ Wants=network-online.target nss-lookup.target connman-vpn.service time-sync.targ
                PIA_PF='true|false'
                PIA_DNS='true|false'
                AUTOCONNECT='false' # if this is set 'true' PREFERRED_REGION is ignored
-                                   # the script must run through all available servers
                       # OR         # which takes a long... long... time
                PREFERRED_REGION='aus_perth'
                                 # [PIA_PF='true|false' /path/to/scripts/get_region.sh]
