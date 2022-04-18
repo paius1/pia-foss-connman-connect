@@ -53,7 +53,7 @@
       #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4
       #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4
 
-  # setup sane environment PRE_UP_RUN is set in systemd unit file
+  # setup sane environment, PRE_UP_RUN is set in systemd.unit file
     if [ -z "${PRE_UP_RUN}" ] #
     then echo "Setting up sane environment" #
          ./pre_up.sh #
@@ -154,8 +154,9 @@ while :; do
     PIA_USER=""
     PIA_PASS=""
   else
-            PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token )
+            PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token ) #
     export PIA_TOKEN
+    rm -f /opt/piavpn-manual/token #
     break
   fi
 done
@@ -193,7 +194,7 @@ if echo "${DISABLE_IPV6:0:1}" | grep -iq n; then
   ${nc}"
 else
    # Called from command line not systemd service #
-     if [[ -t 0 || -p /dev/stdin ]] #
+     if [[ -t 0 || -n "${SSH_TTY}" ]] #
      then #
   echo -e "The variable ${green}DISABLE_IPV6=$DISABLE_IPV6${nc}, does not start with 'n' for 'no'.
 ${green}Defaulting to yes.${nc}
@@ -274,9 +275,10 @@ For example, you can try 0.2 for 200ms allowed latency.
       fi
 
       # Assure that input is numeric and properly formatted.
+#      MAX_LATENCY=0.05 # default
       while :; do
         if [[ -z $latencyInput ]]; then
-          read -r -p "Custom latency (no input required for 0.05s): " latencyInput
+          read -r -p "Custom latency (no input required for 50ms): " latencyInput
           echo
         fi
         customLatency=0
@@ -302,14 +304,14 @@ For example, you can try 0.2 for 200ms allowed latency.
 
       PREFERRED_REGION="none"
       export PREFERRED_REGION
-  # why are we messing with VPN_PROTOCOL
+  # why are we messing with VPN_PROTOCOL #
 #      VPN_PROTOCOL="no"
 #      export VPN_PROTOCOL
-            VPN_PROTOCOL=no ./get_region.sh 2>/dev/null
+            VPN_PROTOCOL=no ./get_region.sh 2>/dev/null #
 
-      if [[ -s /opt/etc/piavpn-manual/latencyList ]]; then
+      if [[ -s /opt/etc/piavpn-manual/latencyList ]]; then #
         # Output the ordered list of servers that meet the latency specification $MAX_LATENCY
-        echo -e "Ordered list of servers with latency less than ${green}${MAX_LATENCY}${nc} seconds:"
+        echo -e "Ordered list of servers with latency less than ${green}${MAX_LATENCY}${nc} seconds:" #
         i=0
         while read -r line; do
           i=$((i+1))
@@ -339,7 +341,7 @@ For example, you can try 0.2 for 200ms allowed latency.
             elif [[ $serverSelection -gt $i ]]; then
               echo -e "\n${red}You must enter a number between 1 and $i.${nc}\n"
             else
-                    PREFERRED_REGION=$( awk 'NR == '"$serverSelection"' {print $2}' /opt/etc/piavpn-manual/latencyList )
+                    PREFERRED_REGION=$( awk 'NR == '"$serverSelection"' {print $2}' /opt/etc/piavpn-manual/latencyList ) #
               echo
               echo -e "${green}PREFERRED_REGION=$PREFERRED_REGION${nc}"
               break
@@ -362,7 +364,7 @@ For example, you can try 0.2 for 200ms allowed latency.
     # Validate in-line declaration of PREFERRED_REGION; if invalid remove input to initiate prompts
     echo "Region input is : $PREFERRED_REGION"
     export PREFERRED_REGION
-                VPN_PROTOCOL=no ./get_region.sh 2>/dev/null
+                VPN_PROTOCOL=no ./get_region.sh 2>/dev/null #
     if [[ $? != 1 ]]; then
       break
     fi
@@ -419,19 +421,18 @@ ${nc}"
 setDNS="yes"
 if ! command -v resolvconf &>/dev/null && [[ $VPN_PROTOCOL == "wireguard" ]]; then
    # Called from command line not systemd service #
-     if [[ -t 0 || -p /dev/stdin ]] #
+     if [[ -t 0 || -n "${SSH_TTY}" ]] #
      then #
-          echo -e "${red}The resolvconf package could not be found."
-          echo "This script can not set DNS for you and you will"
-          echo -e "need to invoke DNS protection some other way.${nc}"
-                echo "We'll use a heredoc in the next step to overcome this" #
-          echo
+          echo -e "${red}The resolvconf package could not be found." #
+          echo "This script can not set DNS for you" #
+          echo -e "but connmanctl can.${nc}" #
+          echo #
      fi #
   setDNS="no"
   # coreelec does not have resolvconf; however we can still create a new /etc/resolv.conf #
-     setDNS="yes"
+     setDNS="yes" #
 fi
-# TODO why  [[ "${PIA_PF}" = 'true' ]] && setDNS='yes'
+
 # Check for in-line definition of PIA_DNS and prompt for input
 if [[ $setDNS == "yes" ]]; then
   if [[ -z $PIA_DNS ]]; then
@@ -455,4 +456,4 @@ echo -e "${green}PIA_DNS=$PIA_DNS${nc}"
 CONNECTION_READY="true"
 export CONNECTION_READY
 
-./get_region.sh 2>/dev/null
+./get_region.sh 2>/dev/null #

@@ -1,20 +1,21 @@
 #!/opt/bin/bash
-#    v 0.0.1, c plgroves gmail 2022
+#    v 0.0.1
 #    SCRIPTNAME 
 #        runs after pia-wireguard service stops
-#        restores the firewall TODO
-#        restores nameservers
+#        or is run by System.Exec in Favourites
+#        stop pia-wireguard.service, deletes any wireguard configs
+#        restores the firewall, restores nameservers
 #        stops port_forwarding.sh
-#        disconnects from any vpn
-#        add any vpn sensitive applications e.g. transmission
+#        add any vpn sensitive applications e.g. transmission to stop
+#        at the end
 #        
 ####
-# 
+# c plgroves @ 2022
 
   # PIA's scripts are set to a relative path
     cd "${0%/*}" || exit 255
 
-  # get mydns, firewall?
+  # get user defined iptables rules
     source .env 2>/dev/null
 
     _Usage() {
@@ -33,12 +34,29 @@
 }
 
     log='/dev/null'
-    LOG="${1:-${log}}"
+    LOG="${1:-${log}}" # export LOG to environment to monitor these scripts
     bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
+
+  # If pia-wireguard.service is running and
+  # ${BASH_SOURCE##*} wasn't called by systemd
+  # shut the service down, which will do everything that follows.
+    if [ -z "${PRE_UP_RUN+y}" ] # not called by systemd
+    then logger "${BASH_SOURCE##*/} was not started by systemd"
+         if systemctl is-active --quiet pia-wireguard.service # service is running
+         then systemctl stop pia-wireguard.service
+              # now this script will run with PRE_UP_RUN set
+              exit 0
+         fi
+    fi
+
+    source /opt/bin/monitor_coreelec-functions
 
   # disconnect VPN
     logger "Disconnecting from Private Internet Access"
     rm /storage/.config/wireguard/pia.config 2>/dev/null
+
+    REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )"
+    kodi_REQ_ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "Wireguard Connection", "message": "Successfully disconnected from '"${REGION}"'" }, "id": 1} '
 
 # OKAY now iptables, DNS are all mangled?
 
@@ -50,13 +68,14 @@
     fi
     iptables-restore < "${MY_FIREWALL:-openrules.v4}"
 
-  # restore a sane DNS
+  # restore a sane DNS .cache/starting_resolv.conf is saved at startup
     logger "restoring sane nameservers"
     if [ -f /storage/.cache/starting_resolv.conf ]
     then cat /storage/.cache/starting_resolv.conf > /etc/resolv.conf
     else logger "no preexisting resolv.conf winging it"
          # first active non vpn_ interface
            iface=$(connmanctl services | awk '/^\*/ && !/vpn_/{print $NF; exit}')
+         # Nameserver definition from $iface/settings
            mapfile  -d ' '  NS < <(awk -F'[=|;]' '/^Nameserver/{print $2}'  /storage/.cache/connman/${iface}/settings)
            nameserver="${NS[0]:-208.67. 222.222}"
     cat <<- EOF > /etc/resolv.conf
@@ -66,12 +85,12 @@ EOF
     fi
 
   # stop port forwarding 
+    logger "stopping port forwarding"
     pf_pids=($(pidof port_forwarding.sh))
     if [ "${#pf_pids[@]}" -ne 0 ]
     then logger "Stopping port forwarding"
          echo "${pf_pids[@]}" | xargs kill -9 >/dev/null 2>&1
     fi
-    #ps aux|grep [p]ort_forward | awk '{print $2}' | xargs kill -9 >/dev/null 2>&1
 
 # add anything else such stopping applications and port forwarding
 exit 0

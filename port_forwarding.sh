@@ -46,6 +46,18 @@ check_tool() {
     check_tool /opt/bin/curl #
     check_tool /opt/bin/jq #
 
+    function logger() {
+        local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}"
+        local tab spaces 
+        tab="${TAB:-100}"
+        IFS="" spaces="$(printf "%$((tab*2))s")"
+        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
+}
+
+    log='/dev/null'
+    LOG="${1:-${log}}" # export LOG to environment to monitor these scripts
+    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
+
   # replace any currently running port_forwarding.sh's #
     pids=($(pidof port_forwarding.sh)) #
     mypid=$$ #
@@ -54,8 +66,7 @@ check_tool() {
     then # remove this instance from pids[@] #
          logger "port_forwarding.sh is already running, will stop others" #
          for i in "${!pids[@]}" #
-         do #
-            if [ "${pids[$i]}" == "$mypid" ] #
+         do if [ "${pids[$i]}" == "$mypid" ] #
             then unset pids[$i] #
             fi #
          done #
@@ -76,12 +87,6 @@ if [[ -z $PF_GATEWAY || -z $PIA_TOKEN || -z $PF_HOSTNAME ]]; then
 exit 1
 fi
 
-  # wait for privateinternetaccess #
-    until ping -c 1 -W 1  privateinternetaccess.com > /dev/null 2>&1 #
-    do logger "wait for privateinternetaccess" #
-       sleep 5 #
-    done #
-
 # Check if terminal allows output, if yes, define colors for output
 if [[ -t 1 ]]; then
   ncolors=$(tput colors 2>/dev/null)
@@ -96,18 +101,6 @@ if [[ -t 1 ]]; then
   fi
 fi
 
-        function logger() { #
-            local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}" #
-            local tab spaces  #
-            tab="${TAB:-100}" #
-            IFS="" spaces="$(printf "%$((tab*2))s")" #
-            printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}" #
-} #
-
-    log='/tmp/port_forward.log' #
-    LOG="${1:-${log}}" #
-    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1)) #
-
 # An error with no recovery logic occured #
 fatal_error () { #
     local port="${1}" #
@@ -115,12 +108,11 @@ fatal_error () { #
     # remove port from iptables
       iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
     logger -n "Attempting Restarting port forwarding in " #
-          for i in {5..1}; do #
-              echo -n "$i..." #
-              sleep 3 #
-          done #
-          echo #
-    PIA_TOKEN="${PIA_TOKEN}" "$(pwd)/${BASH_SOURCE##*/}" >> /tmp/port_forward.log & #
+    sleep 15
+
+    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$PF_GATEWAY PF_HOSTNAME=$PF_HOSTNAME \
+    ./port_forwarding.sh > /tmp/port_forward.log &
+    echo "PIA_TOKEN=${PIA_TOKEN} $(pwd)/${BASH_SOURCE##*/}" >> /tmp/port_forward.log #
     exit 1 #
 } #
 
@@ -201,9 +193,6 @@ expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
         # Dump port to file if requested
           [ -n "$portfile" ] && { echo "${port}" > "$portfile" && \
                                   logger "Port dumped to $portfile"; }
-        # add port to iptables
-          logger "adding peer port ${port} to firewall"
-          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
 
         # Send port forwarding to transmission
           if [[ "${port}" =~ ^[0-9]+$ ]] && grep -q alive < <(/opt/etc/init.d/S88transmission check)
@@ -211,6 +200,10 @@ expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
              logger "adding peer port ${port} to transmission settings"
              transmission-remote localhost:9091 --auth=root:password  -p "${port}" >/dev/null 2>&1
           fi
+
+        # add port to iptables
+          logger "adding peer port ${port} to firewall"
+          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
 
 >&2 echo -ne "
 --> The port is ${green}$port${nc} and it will expire on ${red}$expires_at${nc}. <--
@@ -242,16 +235,14 @@ while true; do
 >&2    echo -e "${green}OK!${nc}" #
 >&2    echo #
 
-    if [ -z "${pf_firstrun}" ]
-    then ((pf_firstrun))
+    if [ -z "${pf_firstrun+y}" ] #
+    then ((pf_firstrun++))
          logger "Forwarded port        $port" #
          logger "Refreshed at          $(date)"
          logger "Expires at            $(date --date="$expires_at")" #
          logger  "$(pwd)/${BASH_SOURCE##*/} will need to remain active to use port forwarding, and will refresh every 15 minutes." #
     else logger "Rebinding to peer port ${port}" #
     fi #
-      # send Forwarding port to journal  
-#        echo "                          Forwarding on port=\"${port}\""
 
     # sleep 15 minutes
     sleep 900

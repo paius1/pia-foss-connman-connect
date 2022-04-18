@@ -18,7 +18,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-# modified for coreELEC/connman plgroves gmail 2022
+# modified for coreELEC/connman plgroves gmail 2022 #
 
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" #
@@ -44,7 +44,7 @@ check_tool() {
 # If the server list has less than 1000 characters, it means curl failed.
 check_all_region_data() {
        # Called from command line not systemd service #
-         if [[ -t 0 || -p /dev/stdin ]]; then #
+         if [[ -t 0 || -n "${SSH_TTY}" ]]; then #
     echo
     echo -n "Getting the server list..."
          fi #
@@ -57,7 +57,7 @@ check_all_region_data() {
 
   # Notify the user that we got the server list.
        # Called from command line not systemd service #
-         if [[ -t 0 || -p /dev/stdin ]]; then #
+         if [[ -t 0 || -n "${SSH_TTY}" ]]; then #
   echo -e "${green}OK!${nc}
   "
          fi #
@@ -123,13 +123,14 @@ printServerLatency() {
 
   regionName="$(echo "${@:3}" |
     sed 's/ false//' | sed 's/true/(geo)/')"
+  # get actual REGION name for "PREFERRED_REGION #
         REGION="$(awk '{print $2}' <<< "${@:1}")" #
 
   time=$(LC_NUMERIC=en_US.utf8 curl -o /dev/null -s \
     --connect-timeout "$connect_timeout" \
     --write-out "%{time_connect}" \
     "http://$serverIP:443")
-  if [[ $? -eq 0 ]]; then # successful connection
+  if [[ $? -eq 0 ]]; then # successful connection #
 
             # compare time to MAX_LATENCY #
             if awk "BEGIN {exit !($MAX_LATENCY >= $time)}" #
@@ -138,14 +139,14 @@ printServerLatency() {
 >&2 echo "Got latency ${time}s for PREFERRED_REGION='${REGION}' ${regionName}" #
     echo "$time $regionID $serverIP"
     # Write a list of servers with acceptable latency
-    # to /opt/etc/piavpn-manual/latencyList
-    echo -e "$time" "$regionID"'\t'"$serverIP"'\t'"$regionName" >> /opt/etc/piavpn-manual/latencyList
+    # to /opt/etc/piavpn-manual/latencyList #
+    echo -e "$time" "$regionID"'\t'"$serverIP"'\t'"$regionName" >> /opt/etc/piavpn-manual/latencyList #
 
             fi #
 
   fi
   # Sort the latencyList, ordered by latency
-  sort -no /opt/etc/piavpn-manual/latencyList /opt/etc/piavpn-manual/latencyList
+  sort -no /opt/etc/piavpn-manual/latencyList /opt/etc/piavpn-manual/latencyList #
 }
 export -f printServerLatency
 
@@ -200,7 +201,7 @@ if [[ $selectedRegion == "none" ]]; then
     exit 1
   else
     echo -e "A list of servers and connection details, ordered by latency can be
-found in at : ${green}/opt/etc/piavpn-manual/latencyList${nc}
+found in at : ${green}/opt/etc/piavpn-manual/latencyList${nc} #
 "
   fi
 else
@@ -209,24 +210,24 @@ else
 fi
 
 get_selected_region_data
-    echo "$regionData" > /tmp/regionData
-bestServer_meta_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].ip')
-bestServer_meta_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].cn')
-bestServer_WG_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].ip')
-bestServer_WG_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].cn')
-bestServer_OT_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].ip')
-bestServer_OT_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].cn')
-bestServer_OU_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].ip')
-bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].cn')
+    echo "$regionData" > /tmp/regionData #
+bestServer_meta_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].ip') #
+bestServer_meta_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].cn') #
+bestServer_WG_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].ip') #
+bestServer_WG_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].cn') #
+bestServer_OT_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].ip') #
+bestServer_OT_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpntcp[0].cn') #
+bestServer_OU_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].ip') #
+bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0].cn') #
     bestServer_region=$(echo "$regionData" | /opt/bin/jq -r '.id') #
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
    # Called from command line not systemd service #
-     if [[ -t 0 || -p /dev/stdin ]] #
+     if [[ -t 0 || -n "${SSH_TTY}" ]] #
      then #
-  echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}"
-  if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then
+  echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}" #
+  if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then #
     echo " (geolocated region)."
   else
     echo "."
@@ -254,16 +255,16 @@ if [[ -z $PIA_TOKEN ]]; then
   ./get_token.sh
   PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token ) #
   export PIA_TOKEN
-  rm -f /opt/etc/piavpn-manual/token
+  rm -f /opt/etc/piavpn-manual/token #
 else
-  echo -e "Using existing token ${green}\$PIA_TOKEN${nc}."
+  echo -e "Using existing token ${green}\$PIA_TOKEN${nc}." #
   echo
 fi
 
 # Connect with WireGuard and clear authentication token file and latencyList
 if [[ $VPN_PROTOCOL == "wireguard" ]]; then
-   # Called from command line not systemd service
-     if [[ -t 0 || -p /dev/stdin ]] #
+   # Called from command line not systemd service #
+     if [[ -t 0 || -n "${SSH_TTY}" ]] #
      then #
   echo "The ./get_region.sh script got started with"
   echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
@@ -275,7 +276,6 @@ if [[ $VPN_PROTOCOL == "wireguard" ]]; then
      fi #
   PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
   WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
-
     # keep this file to get PREFERRED_REGION #
       #rm -f /opt/etc/piavpn-manual/latencyList #
   exit 0
@@ -303,6 +303,6 @@ if [[ $VPN_PROTOCOL == openvpn* ]]; then
     OVPN_HOSTNAME=$serverHostname \
     CONNECTION_SETTINGS=$VPN_PROTOCOL \
     ./connect_to_openvpn_with_token.sh
-  #rm -f /opt/etc/piavpn-manual/latencyList
+  #rm -f /opt/etc/piavpn-manual/latencyList #
   exit 0
 fi

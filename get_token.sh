@@ -18,7 +18,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-# modified for coreELEC/connman plgroves gmail 2022
+# modified for coreELEC/connman plgroves gmail 2022 #
 
 # This function allows you to check if the required tools have been installed.
 check_tool() {
@@ -75,7 +75,7 @@ echo -n "Checking login credentials..."
 generateTokenResponse=$(curl -s -u "$PIA_USER:$PIA_PASS" \
   "https://www.privateinternetaccess.com/gtoken/generateToken")
 
-if [[ $(echo "$generateTokenResponse" | /opt/bin/jq -r '.status') != "OK" ]]; then
+if [[ $(echo "$generateTokenResponse" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   echo
   echo
   echo -e "${red}Could not authenticate with the login credentials provided!${nc}"
@@ -85,12 +85,12 @@ fi
 
 echo -e "${green}OK!"
 echo
-token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token')
+token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token') #
 tokenExpiration=$(timeout_timestamp)
 tokenLocation=/opt/etc/piavpn-manual/token
 
    # Called from command line not systemd service #
-     if [[ -t 0 || -p /dev/stdin ]] #
+     if [[ -t 0 || -n "${SSH_TTY}" ]] #
      then #
           echo -e "PIA_TOKEN=$token${nc}"
           echo #

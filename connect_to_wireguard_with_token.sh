@@ -109,41 +109,45 @@ wireguard_json="$(curl -s -G \
 export wireguard_json
 
 # Check if the API returned OK and stop this script if it didn't.
-if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then
+if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   >&2 echo -e "${red}Server did not return OK. Stopping now.${nc}"
   exit 1
 fi
 
 
 # CONNMAN sets up the interface ignoring wg-quick #
-
+# Create the WireGuard config based on the JSON received from the API
+# In case you want this section to also add the DNS setting, please
+# start the script with PIA_DNS=true.
+# This uses a PersistentKeepalive of 25 seconds to keep the NAT active
+# on firewalls. You can remove that line if your network does not
+# require it.
 if [[ $PIA_DNS == "true" ]]; then
   dnsServer=$(echo "$wireguard_json" | /opt/bin/jq -r '.dns_servers[0]')
      # running from cli
-       if [[ -t 0 || -p /dev/stdin ]] #
-       then #
+       if [[ -t 0 || -n "${SSH_TTY}" ]] #
+       then echo #
   echo "Set up DNS to $dnsServer. Since we do not have resolvconf," #
-  echo "we will just heredoc it to /etc/resolv.conf" #
-  echo "since connman uses any preset dns resolvers first" #
+  echo "we will rely on connman to set nameservers" #
+  echo "and ensure ${dnsServer} is the first one" #
   echo
        fi #
-  dnsSettingForVPN="DNS = ${dnsServer}"
+  dnsSettingForVPN="DNS = ${dnsServer}" #
 fi
-
-echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
+echo -n "Trying to write /opt/etc/wireguard/pia.conf..." #
   # changed path #
     mkdir -p /opt/etc/wireguard #
 echo "
 [Interface]
-Address = $(echo "$wireguard_json" | /opt/bin/jq -r '.peer_ip')
+Address = $(echo "$wireguard_json" | /opt/bin/jq -r '.peer_ip') #
 PrivateKey = $privKey
-ListenPort = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_port')
+ListenPort = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_port') #
 $dnsSettingForVPN
 [Peer]
 PersistentKeepalive = 25
-PublicKey = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_key')
+PublicKey = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_key') #
 AllowedIPs = 0.0.0.0/0
-Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | /opt/bin/jq -r '.server_port')
+Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | /opt/bin/jq -r '.server_port') #
 " > /storage/.opt/etc/wireguard/pia.conf || exit 1 # changed path #
 echo -e "${green}OK!${nc}"
 
@@ -174,63 +178,93 @@ echo -e "${green}OK!${nc}"
 
   # I placed this here for interactive use of these scripts #
   # CONNMAN_CONNECT is set true by systemd; AUTOCONNECT from environment #
-  # also -t 0 && -p /dev/stdin #
+  # also -t 0 && -n "${SSH_TTY}" #
     if [[ "${CONNMAN_CONNECT}" = "true" ]] || [[ "${AUTOCONNECT}" = "true" ]] #
     then echo "CONNMAN service ${SERVICE}! is ready" #
-    else #
-         if [[ -t 0 && -p /dev/stdin ]] #
-         then echo "CONNMAN service ${SERVICE}! is ready" #
-              echo -n "Do you wish to connect now([Y]es/[n]o): " #
+    else # dialog to connect or not connect that is the question
+         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         then echo -e "\nCONNMAN service ${SERVICE}! is ready" #
+              echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
               echo #
               if echo "${connect:0:1}" | grep -iq n #
-              then echo "go to Settings > Coreelec > Connections to connect" #
-                   echo "This may not set DNS" #
-                   echo "     WILL NOT set iptables killswitch!?" #
-                   echo "iptables-restore $(pwd)/rules-wireguard.v4 WILL!" #
-                   echo "" #
+              then echo "to connect manually go to"
+                   echo "   Settings > Coreelec > Connections, select WireGuard and connect" #
+                   echo "   This may not set DNS" #
+                   echo "   and WILL NOT set iptables killswitch!?" #
+                   echo "      iptables-restore $(pwd)/rules-wireguard.v4 WILL!" #
+                   echo #
+                   if [[ "${PIA_PF}" = 'true' ]]; then
+                        echo  -e "\tTo enable port forwarding run\n" 
+                        echo -e "    PIA_TOKEN=$PIA_TOKEN \\ 
+    PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \\
+    $(pwd)/port_forwarding.sh" #
+                        echo -e "\n\t/port_forwading.sh must be left running to maintain the port" #
+                        echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background" #
+                        echo #
+                   fi
                    exit 0 #
               fi #
+         else echo # can't interact and CONNMAN_CONNECT AUTOCONNECT != true
+              echo -e "\tvpn_config is ready
+    and can be brought up from Settings > Coreelec > Connections
+    this precludes port forwarding and setting a safe firewall"
+              exit 0
          fi
     fi #
 
-    if connmanctl connect "${SERVICE}" #
+         source /opt/bin/monitor_coreelec-functions
+  # Connect with connmanctl #
+    if connmanctl connect "${SERVICE}" # 
     then echo "Setting up firewall" #
-         # System start? #
-           if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
-           then echo taking 3 #
-                lsmod | grep -q '^ip_tables' || echo ip_tables module not loaded #
-                lsmod | grep -q '^ip_tables' || modprobe ip_tables #
-                sleep 3 #
-                lsmod | grep -q '^ip_tables' && echo -e "\nip_tables module loaded\n" #
-           fi
-sleep 2
-         iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}" #
-
-         echo "" #
-         if [[ $PIA_DNS == "true" ]] #
-         then # connman subordinates vpn dns to any preset nameservers #
-         if [ $(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf) != "${DNS}" ]
-         then echo "Replacing Connmans DNS with PIA DNS"
-              sed -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
-                      /etc/resolv.conf > r.c.n
-              cat r.c.n > /etc/resolv.conf && rm r.c.n
+         #                       SYSTEM START?           #
+         if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
+         then echo taking 3 #
+              lsmod | grep -q '^ip_tables' || echo ip_tables module not loaded #
+              lsmod | grep -q '^ip_tables' || modprobe ip_tables #
+              sleep 3 #
+              lsmod | grep -q '^ip_tables' && echo -e "\nip_tables module loaded\n" #
          fi
-
-         fi #
-    else echo "CONNMAN service ${SERVICE} failed!" #
-         exit 255 #
-    fi #
-
+sleep 2
 #####################################################################
 # Remember to check /storage/.config/autostart.sh for any conflicts #
 #####################################################################
+  # Iptables-restore vpn killswitch
+    iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}" #
 
-  # This section will stop the script if PIA_PF is not set to "true". #
+         # running from cli
+           if [[ -t 0 || -n "${SSH_TTY}" ]] #
+           then echo #
+                echo "   The WireGuard interface got created.
+
+    At this point, internet should work via WIREGUARD VPN.
+
+    To disconnect the VPN, run:
+
+    --> $(pwd)/shutdown.sh <--
+"
+           fi
+    else echo "CONNMAN service ${SERVICE} failed!" #
+         kodi_REQ_ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "Wireguard Connection", "message": "               FAILED            " }, "id": 1} '
+         exit 255 #
+    fi
+
+  # added this section to check and set nameservers since not using wg-quick
+    if [[ $PIA_DNS == "true" ]] #
+    then # connman subordinates vpn dns to any preset nameservers #
+         if [ "$(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf)" != "${DNS}" ] #
+         then echo "Replacing Connmans DNS with PIA DNS" #
+              sed -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
+                     /etc/resolv.conf > r.c.n #
+              cat r.c.n > /etc/resolv.conf && rm r.c.n #
+         fi #
+    fi #
+
+  # This section will exit the script if PIA_PF is not set to "true". #
   # the command for port forwarding will be sent to /tmp/port_forward.log #
     if [[ $PIA_PF != "true" ]] #
-    then echo -e "\tTo enable port forwarding" #, start the script:" #
-         if [[ -t 0 && -p /dev/stdin ]] #
+    then echo -e "\tTo enable port forwarding\n" #, start the script:" #
+         if [[ -t 0 || -n "${SSH_TTY}" ]] #
          then #
               echo "The gateway must be port forwarding enabled." #
               echo "$ PIA_PF=true $(pwd)/get_region returns a filtered list.)" #
@@ -239,22 +273,29 @@ sleep 2
               echo #
          fi
          echo "$ PIA_TOKEN=$PIA_TOKEN" "PF_GATEWAY=$WG_SERVER_IP" "PF_HOSTNAME=$WG_HOSTNAME" \
-         "$(pwd)/port_forwarding.sh" | tee  /tmp/port_forward.log #
+ "$(pwd)/port_forwarding.sh" | tee  /tmp/port_forward.log #
          echo #
          exit 1 #
     fi #
 
-   # Called from command line not systemd service #
-     if [[ -t 0 || -p /dev/stdin ]] #
-     then  #
-#        echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh"
-        echo "Enabling port forwarding by running: PIA_TOKEN=\$PIA_TOKEN \\
-          PF_GATEWAY=$WG_SERVER_IP" "PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh"
-     fi #
-        echo "logging port_forwarding.sh to /tmp/port_forward.log" #
+  # Called from command line not systemd service #
+    if [[ -t 0 || -n "${SSH_TTY}" ]] #
+    then echo #
+#         echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh"
+         echo "Enabling port forwarding by running: PIA_TOKEN=\$PIA_TOKEN \\
+ PF_GATEWAY=$WG_SERVER_IP" "PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh"
+    fi #
 
-       PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \
-          ./port_forwarding.sh > /tmp/port_forward.log &
+    echo "          logging port_forwarding.sh to /tmp/port_forward.log" #
+
+    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \
+    ./port_forwarding.sh > /tmp/port_forward.log &
+
+  # if I was called outside of systemd, then we need to run ./post_up.sh
+    if [ -z "${PRE_UP_RUN+y}" ] #
+    then echo "Not called by systemd"
+         ./post_up.sh > /dev/null &
+    fi
 
 #############################################
  exit 0                                     #

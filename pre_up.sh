@@ -9,6 +9,7 @@
 #              stop vpn dependent applications e.g. port_forwarding, transmission
 ####
 # 
+
     _Usage() {
          sed >&2 -n "1d; /^###/q; /^#/!q; s/^#*//; s/^ //; 
                      s/SCRIPTNAME/${BASH_SOURCE##*/}/; p" \
@@ -42,8 +43,19 @@
     fi
 
   # stop any VPN's previously started
-    logger "Removing any existing VPN"
-    rm /storage/.config/wireguard/pia.config 2>/dev/null
+    logger "Disconnecting any existing VPN"
+  # Was I called outside of systemd and pia-wireguard.service is running
+    if [ -z "${PRE_UP_RUN+y}" ] # not called by systemd
+    then logger "${BASH_SOURCE##*/} was not started by systemd"
+         if systemctl is-active --quiet pia-wireguard
+         then logger "Stopping pia-wireguard.service"
+              systemctl stop pia-wireguard # service is running
+             # I think this is okay above will remove pia.config (./shutdown.sh)
+         else logger "Removing pia.config"
+              rm /storage/.config/wireguard/pia.config 2>/dev/null
+         fi
+   fi
+#    connmanctl disconnect "$(grep VPN < <( connmanctl services) | awk '{print $NF}')"
 
   # Can I reach the interwebs
     if ! ping -c 1  -W 1  -q 8.8.8.8 > /dev/null 2>&1
