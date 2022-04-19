@@ -45,15 +45,16 @@ ConditionFileNotEmpty=/path/to/scripts/.env
 Type=oneshot
 RemainAfterExit=yes
 
-; connect on success as this is not interactive
-Environment="CONNMAN_CONNECT=true"
-; no need to run pre_up.sh twice
-Environment="PRE_UP_RUN=true"
-
 ; optional stuff to do before connecting
 ; e.g. stopping existing VPN connection, adjusting firewall, stopping 
 ;      any vpn dependent applications
 ExecStartPre=/path/to/scripts/pre_up.sh
+
+; no need to run pre_up.sh twice
+Environment="PRE_UP_RUN=true"
+
+; connect on success as this is non-interactive
+Environment="CONNMAN_CONNECT=true"
 
 ExecStart=/path/to/scripts/run_setup.sh
 

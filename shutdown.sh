@@ -33,7 +33,7 @@
         printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
 }
 
-    log='/dev/null'
+    log="${LOG:=/dev/null}"
     LOG="${1:-${log}}" # export LOG to environment to monitor these scripts
     bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
 
@@ -49,14 +49,16 @@
          fi
     fi
 
-    source /opt/bin/monitor_coreelec-functions
-
-  # disconnect VPN
-    logger "Disconnecting from Private Internet Access"
-    rm /storage/.config/wireguard/pia.config 2>/dev/null
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-foss-connman-connect/kodi_assets/functions
+    [ -z "${kodi_user}" ] && source ./kodi_assets/functions
 
     REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )"
-    kodi_REQ_ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "Wireguard Connection", "message": "Successfully disconnected from '"${REGION}"'" }, "id": 1} '
+  # disconnect VPN
+    logger "Disconnecting from ${REGION}"
+    rm /storage/.config/wireguard/pia.config 2>/dev/null
+
+    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] && \
+    _pia_notify 'Disconnected from '"${REGION}"' '
 
 # OKAY now iptables, DNS are all mangled?
 

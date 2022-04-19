@@ -176,76 +176,93 @@ echo -e "${green}OK!${nc}"
     WireGuard.PersistentKeepalive = ${PersistentKeepalive}
 	EOF
 
+
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-foss-connman-connect/kodi_assets/functions
+    [ -z "${kodi_user}" ] && source ./kodi_assets/functions
+    REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )"
   # I placed this here for interactive use of these scripts #
   # CONNMAN_CONNECT is set true by systemd; AUTOCONNECT from environment #
-  # also -t 0 && -n "${SSH_TTY}" #
+  # what if AUTOCONNECT is set to false
+  # also not -t 0 && -n "${SSH_TTY}" #
+#    non interactive
+#    [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
+#    interactive
+#    [[ -t 0 || -n "${SSH_TTY}" ]]
     if [[ "${CONNMAN_CONNECT}" = "true" ]] || [[ "${AUTOCONNECT}" = "true" ]] #
     then echo "CONNMAN service ${SERVICE}! is ready" #
-    else # dialog to connect or not connect that is the question
+    else # dialog to connect or not connect that is the question #
          if [[ -t 0 || -n "${SSH_TTY}" ]] #
          then echo -e "\nCONNMAN service ${SERVICE}! is ready" #
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
               echo #
               if echo "${connect:0:1}" | grep -iq n #
-              then echo "to connect manually go to"
-                   echo "   Settings > Coreelec > Connections, select WireGuard and connect" #
-                   echo "   This may not set DNS" #
-                   echo "   and WILL NOT set iptables killswitch!?" #
-                   echo "      iptables-restore $(pwd)/rules-wireguard.v4 WILL!" #
+              then echo -e "to connect manually go to"
+                   echo -e "\tSettings > Coreelec > Connections, select WireGuard and connect" #
+                   echo -e "\t    This may not set DNS and" #
+                   echo -e "\t    WILL NOT set iptables killswitch!?" #
+                   echo -e "\tiptables-restore $(pwd)/rules-wireguard.v4     WILL!" #
                    echo #
-                   if [[ "${PIA_PF}" = 'true' ]]; then
+                   #if [[ "${PIA_PF}" = 'true' ]]; then
                         echo  -e "\tTo enable port forwarding run\n" 
-                        echo -e "    PIA_TOKEN=$PIA_TOKEN \\ 
-    PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \\
-    $(pwd)/port_forwarding.sh" #
-                        echo -e "\n\t/port_forwading.sh must be left running to maintain the port" #
+                        echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" #
+                   if [[ "${PIA_PF}" != 'true' ]]; then
+                        #echo -e "\t Note: the server must be" #
+                        echo
+                        echo -e "\tThe location used must be port forwarding enabled, or this will fail."
+                        echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
+                   fi
+                        echo -e "\n\tport_forwading.sh must be left running to maintain the port" #
                         echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background" #
                         echo #
-                   fi
                    exit 0 #
               fi #
-         else echo # can't interact and CONNMAN_CONNECT AUTOCONNECT != true
-              echo -e "\tvpn_config is ready
-    and can be brought up from Settings > Coreelec > Connections
-    this precludes port forwarding and setting a safe firewall"
+         else _pia_notify 'Connection is configured for '"${REGION}"' '
+              sleep 5
+              _pia_notify "Goto Settings > Coreelec > Connections"
+              sleep 4
+              _pia_notify "Goto Settings > Coreelec > Connections"
+              sleep 4
+              _pia_notify "This precludes port forwarding and setting a safe firewall"
               exit 0
          fi
     fi #
 
-         source /opt/bin/monitor_coreelec-functions
   # Connect with connmanctl #
     if connmanctl connect "${SERVICE}" # 
-    then echo "Setting up firewall" #
-         #                       SYSTEM START?           #
-         if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
-         then echo taking 3 #
-              lsmod | grep -q '^ip_tables' || echo ip_tables module not loaded #
-              lsmod | grep -q '^ip_tables' || modprobe ip_tables #
-              sleep 3 #
-              lsmod | grep -q '^ip_tables' && echo -e "\nip_tables module loaded\n" #
-         fi
-sleep 2
-#####################################################################
-# Remember to check /storage/.config/autostart.sh for any conflicts #
-#####################################################################
-  # Iptables-restore vpn killswitch
-    iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}" #
-
-         # running from cli
-           if [[ -t 0 || -n "${SSH_TTY}" ]] #
-           then echo #
-                echo "   The WireGuard interface got created.
-
-    At this point, internet should work via WIREGUARD VPN.
+    then # SUCCESS
+         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         then echo #
+              echo "    The WireGuard interface got created.
+        At this point, internet should work via WIREGUARD VPN.
 
     To disconnect the VPN, run:
 
     --> $(pwd)/shutdown.sh <--
 "
-           fi
+         else
+              _pia_notify 'Successfully connected to '"${REGION}"' '
+         fi
+sleep 2
+    echo "Setting up firewall" #
+         #                       SYSTEM START?           #
+         if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
+         then echo taking 3 #
+#####################################################################
+# Remember to check /storage/.config/autostart.sh for any conflicts #
+#####################################################################
+              lsmod | grep -q '^ip_tables' || echo ip_tables module not loaded #
+              lsmod | grep -q '^ip_tables' || modprobe ip_tables #
+              sleep 3 #
+              lsmod | grep -q '^ip_tables' && echo -e "\nip_tables module loaded\n" #
+         fi
+
+  # Iptables-restore vpn killswitch #
+    iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}" #
+
     else echo "CONNMAN service ${SERVICE} failed!" #
-         kodi_REQ_ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "Wireguard Connection", "message": "               FAILED            " }, "id": 1} '
+         [[ ! -t 0 && ! -n "${SSH_TTY}" ]] && \
+           _pia_notify "    FAILED            " #
          exit 255 #
     fi
 
@@ -257,33 +274,22 @@ sleep 2
               sed -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
                      /etc/resolv.conf > r.c.n #
               cat r.c.n > /etc/resolv.conf && rm r.c.n #
+              echo
          fi #
     fi #
 
   # This section will exit the script if PIA_PF is not set to "true". #
   # the command for port forwarding will be sent to /tmp/port_forward.log #
     if [[ $PIA_PF != "true" ]] #
-    then echo -e "\tTo enable port forwarding\n" #, start the script:" #
-         if [[ -t 0 || -n "${SSH_TTY}" ]] #
-         then #
-              echo "The gateway must be port forwarding enabled." #
-              echo "$ PIA_PF=true $(pwd)/get_region returns a filtered list.)" #
-              echo "$(pwd)/port_forwading.sh must be left running to maintain the port" #
-              echo "It WILL TIE UP A CONSOLE unless run in the background" #
-              echo #
-         fi
-         echo "$ PIA_TOKEN=$PIA_TOKEN" "PF_GATEWAY=$WG_SERVER_IP" "PF_HOSTNAME=$WG_HOSTNAME" \
- "$(pwd)/port_forwarding.sh" | tee  /tmp/port_forward.log #
+    then echo -e "    To enable port forwarding run\n" #, start the script:" #
+         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" #
+         echo #
+         echo -e "    The location used must be port forwarding enabled, or this will fail."
+         echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
+         echo -e "\n    port_forwading.sh must be left running to maintain the port" #
+         echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background" #
          echo #
          exit 1 #
-    fi #
-
-  # Called from command line not systemd service #
-    if [[ -t 0 || -n "${SSH_TTY}" ]] #
-    then echo #
-#         echo "Enabling port forwarding by running: PIA_TOKEN=$PIA_TOKEN $(pwd)/pf.sh"
-         echo "Enabling port forwarding by running: PIA_TOKEN=\$PIA_TOKEN \\
- PF_GATEWAY=$WG_SERVER_IP" "PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh"
     fi #
 
     echo "          logging port_forwarding.sh to /tmp/port_forward.log" #
@@ -294,6 +300,7 @@ sleep 2
   # if I was called outside of systemd, then we need to run ./post_up.sh
     if [ -z "${PRE_UP_RUN+y}" ] #
     then echo "Not called by systemd"
+         echo calling post_up.sh
          ./post_up.sh > /dev/null &
     fi
 
