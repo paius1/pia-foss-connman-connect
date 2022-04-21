@@ -6,38 +6,11 @@ Wants=network-online.target nss-lookup.target connman-vpn.service time-sync.targ
 
 ; Predefined variables for the pia-foss manual connections scripts
 ; without these the pia-foss/manual-connections scripts run interactively
+; these should be save to ./.env
+;
 ; minimum file:
 ;               PIA_USER=pXXXXXXX
 ;               PIA_PASS=p45sw0rdxx
-;               PIA_PF='true|false'
-;               PIA_DNS='true|false'
-;               AUTOCONNECT='false' # if set true PREFERRED_REGION is ignored
-;                                   # the script must run through all available servers
-;                                   # and takes a long... long... time
-;               PREFERRED_REGION='aus_perth'
-;               # PIA_PF=(true|false) /path/to/get_region.sh 2>/dev/null | grep PREFERRED_REGION
-;
-; optional: these are not part of pia-foss, and must be exported
-;               export CONNMAN_CONNECT='true' # overcomes AUTOCONNECT's limitation,
-;                                              # is set in service unit
-;             # roll your own firewall   
-;               export MY_FIREWALL=/path/to/normal/iptables-save.file
-;               export WG_FIREWALL=/path/to/wireguard/iptables-save.file
-  minimum file
-               PIA_USER=pXXXXXXX
-               PIA_PASS=p45sw0rdxx
-               PIA_PF='true|false'
-               PIA_DNS='true|false'
-               AUTOCONNECT='false' # if this is set 'true' PREFERRED_REGION is ignored
-                      # OR         # which takes a long... long... time
-               PREFERRED_REGION='aus_perth'
-                                # [PIA_PF='true|false' /path/to/scripts/get_region.sh]
-                                # for valid options
-  optional: these are not part of pia-foss, and must be exported
-               export CONNMAN_CONNECT='true' overcomes AUTOCONNECT's limitation,
-                                             and set in service unit
-               export MY_FIREWALL=/path/to/normal/iptables-save.file
-               export WG_FIREWALL=/path/to/wireguard/iptables-save.file
 
 ConditionFileNotEmpty=/path/to/scripts/.env
 
@@ -58,10 +31,10 @@ Environment="CONNMAN_CONNECT=true"
 
 ExecStart=/path/to/scripts/run_setup.sh
 
-; stuff to do after connecting e.g. port forwarding
+; stuff to do after connecting e.g. restarting transmission
 ExecStartPost=-/path/to/scripts/post_up.sh
 
-; disconnect from wireguard
+; disconnect from wireguard, adjust firewall, dns, stop port forward, etc.
 ExecStop=/path/to/scripts/shutdown.sh
 
 [Install]

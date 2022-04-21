@@ -22,8 +22,8 @@
         printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
 }
 
-    log='/dev/null'
-    LOG="${1:-${log}}"
+    log="${LOG:=/dev/null}"
+    LOG="${1:-${log}}" # export LOG to environment to monitor these scripts
     bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
 
   # PIA's scripts are set to a relative path

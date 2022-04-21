@@ -49,13 +49,12 @@
          fi
     fi
 
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-foss-connman-connect/kodi_assets/functions
     [ -z "${kodi_user}" ] && source ./kodi_assets/functions
 
     REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )"
   # disconnect VPN
     logger "Disconnecting from ${REGION}"
-    rm /storage/.config/wireguard/pia.config 2>/dev/null
+    connmanctl disconnect "$(grep vpn_ < <( connmanctl services) | awk '{print $NF}')"
 
     [[ ! -t 0 && ! -n "${SSH_TTY}" ]] && \
     _pia_notify 'Disconnected from '"${REGION}"' '

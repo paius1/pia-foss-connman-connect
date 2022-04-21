@@ -1,44 +1,45 @@
 #!/opt/bin/bash
 #    v 0.0.1, c plgroves gmail 2022
-#    SCRIPTNAME 
-#        runs before pia-wireguard service is up
+#    SCRIPTNAME called by PATH/run_setup.sh
+#        before pia-wireguard service is up
+#        
 #        sets a safe and sane environment
-#         e.g. delete existing vpn_
-#              reset the firewall
-#              set working nameservers
+#         e.g. disconnect vpn_XX_XX_XX_XX
+#              reset firewall
+#              set nameservers
 #              stop vpn dependent applications e.g. port_forwarding, transmission
 ####
 # 
 
     _Usage() {
          sed >&2 -n "1d; /^###/q; /^#/!q; s/^#*//; s/^ //; 
-                     s/SCRIPTNAME/${BASH_SOURCE##*/}/; p" \
+                     s!PATH!$(pwd)!; s/SCRIPTNAME/${BASH_SOURCE##*/}/; p" \
                     "${BASH_SOURCE%/*}/${BASH_SOURCE##*/}"
          exit 1; }
     [[ "$1" =~ ^[-hH] ]] && _Usage "$@"
-
-    function logger() {
-        local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}"
-        local tab spaces 
-        tab="${TAB:-100}"
-        IFS="" spaces="$(printf "%$((tab*2))s")"
-        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
-}
-
-    log='/dev/null'
-    LOG="${1:-${log}}"
-    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
 
   # PIA's scripts are set to a relative path
     cd "${0%/*}" || exit 255
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
 
+    function logger() {
+        local message="${1}"; local source="${2:-${BASH_SOURCE[0]}}"; local log="${3:-$LOG}"
+        local tab spaces 
+        tab="${TAB:-100}"
+        IFS="" spaces="$(printf "%$((tab*2))s")"
+        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
+}
+
+    log="${LOG:=/dev/null}" # export or set LOG to monitor scripts added to pia-foss
+    LOG="${1:-${log}}"
+    bash_source="${#BASH_SOURCE[0]}"; export TAB=$((bash_source+1))
+
   # on SYSTEM START wait for things to settle down
   # and save a copy of /etc/resolv.conf
     if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]]
-    then sleep 5
-         logger "System Startup..."
+    then logger "System Startup waiting..."
+         sleep 5
          cp /etc/resolv.conf /storage/.cache/starting_resolv.conf
     fi
 
@@ -50,12 +51,11 @@
          if systemctl is-active --quiet pia-wireguard
          then logger "Stopping pia-wireguard.service"
               systemctl stop pia-wireguard # service is running
-             # I think this is okay above will remove pia.config (./shutdown.sh)
-         else logger "Removing pia.config"
-              rm /storage/.config/wireguard/pia.config 2>/dev/null
+             # I think this is okay above, calls ./shutdown.sh
+         else logger "Disconnecting any VPN's"
+              connmanctl disconnect "$(grep vpn_ < <( connmanctl services) | awk '{print $NF}')"
          fi
    fi
-#    connmanctl disconnect "$(grep VPN < <( connmanctl services) | awk '{print $NF}')"
 
   # Can I reach the interwebs
     if ! ping -c 1  -W 1  -q 8.8.8.8 > /dev/null 2>&1
@@ -72,7 +72,7 @@
     then echo "restoring DNS"
          # this is a copy of /etc/resov.conf saved at system start by pre_up.sh
          if [ -f /storage/.cache/starting_resolv.conf ]
-         then cat /storage/.cache/starting_resolv.conf /etc/resolv.conf
+         then cat /storage/.cache/starting_resolv.conf > /etc/resolv.conf
          else logger "no preexisting resolv.conf winging it"
               # first active non vpn_ interface
                 iface=$(connmanctl services | awk '/^\*/ && !/vpn_/{print $NF; exit}')
@@ -86,7 +86,7 @@ EOF
          fi
     fi
 
-  # max_timeout for systemd
+  # timeout for systemd
     max_count=10
   # Now wait for full connection
     until ping -c 1  -W 1  -q privateinternetaccess.com > /dev/null

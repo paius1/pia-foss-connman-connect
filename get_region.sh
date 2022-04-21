@@ -18,10 +18,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+##
 # modified for coreELEC/connman plgroves gmail 2022 #
+# hard coded/changed paths
+# added 1 second the curl timeout to ensure non-zero replies
 
   # PIA's scripts are set to a relative path #
-    cd "${0%/*}" #
+    cd "${0%/*}" || exit 1 #
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
@@ -43,8 +46,10 @@ check_tool() {
 
 # If the server list has less than 1000 characters, it means curl failed.
 check_all_region_data() {
+# IS this really needed
        # Called from command line not systemd service #
-         if [[ -t 0 || -n "${SSH_TTY}" ]]; then #
+         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         then #
     echo
     echo -n "Getting the server list..."
          fi #
@@ -56,6 +61,7 @@ check_all_region_data() {
   fi
 
   # Notify the user that we got the server list.
+# is this really needed
        # Called from command line not systemd service #
          if [[ -t 0 || -n "${SSH_TTY}" ]]; then #
   echo -e "${green}OK!${nc}
@@ -118,7 +124,7 @@ printServerLatency() {
   serverIP=$1
   regionID=$2
 
-        # increased connect-timeout by 1 to get any no 0 replies #
+        # increased --connect-timeout by 1 to get any no 0 replies #
           local connect_timeout=$(echo $MAX_LATENCY 1 | awk '{print $1 + $2}') #
 
   regionName="$(echo "${@:3}" |
@@ -187,17 +193,33 @@ if [[ $selectedRegion == "none" ]]; then
     /opt/bin/jq -r '.regions[] |
     .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   fi
+      # Running thru server list takes a long time in a post-modem world
+        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
+        then echo "running non-interactive PREFERRED_REGION unset" #
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
+             [ -z "${kodi_user}" ] && source ./kodi_assets/functions || exit 255 #
+             for i in {1..8}; do _pia_notify "Testing for fastest Servers"; sleep 4; done& disown #
+        else #
   echo -e Testing regions that respond \
     faster than "${green}$MAX_LATENCY${nc}" seconds:
+        fi #
   selectedRegion="$(echo "$summarized_region_data" |
     xargs -I{} bash -c 'printServerLatency {}' |
     sort | head -1 | awk '{ print $2 }')"
   echo
 
   if [[ -z $selectedRegion ]]; then
+# MAX_LATENCY is too low #
+        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+        then echo "running non-interactive No region responded" #
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
+             [ -z "${kodi_user}" ] && { source ./kodi_assets/functions || echo failed; } #
+             for i in {1..3}; do _pia_notify "No region responded in ${MAX_LATENCY}s. Set a higher MAX_LATENCY."; sleep 4; done #
+        else #
     echo -e "${red}No region responded within ${MAX_LATENCY}s, consider using a higher timeout."
     echo "For example, to wait 1 second for each region, inject MAX_LATENCY=1 like this:"
     echo -e "$ MAX_LATENCY=1 ./get_region.sh${nc}"
+        fi #
     exit 1
   else
     echo -e "A list of servers and connection details, ordered by latency can be
@@ -255,7 +277,8 @@ if [[ -z $PIA_TOKEN ]]; then
   ./get_token.sh
   PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token ) #
   export PIA_TOKEN
-  rm -f /opt/etc/piavpn-manual/token #
+# dont delete, can reuse for 24 hours #
+#rm -f /opt/etc/piavpn-manual/token #
 else
   echo -e "Using existing token ${green}\$PIA_TOKEN${nc}." #
   echo
@@ -269,14 +292,14 @@ if [[ $VPN_PROTOCOL == "wireguard" ]]; then
   echo "The ./get_region.sh script got started with"
   echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
   echo "by running this command:"
-  echo -e "$ ${green}PIA_TOKEN=$PIA_TOKEN \\"
-  echo "WG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\"
-  echo -e "PIA_PF=$PIA_PF ./connect_to_wireguard_with_token.sh${nc}"
+  echo -e "$ ${green}\tPIA_TOKEN=$PIA_TOKEN \\" # added tabs
+  echo "\tWG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\" #
+  echo -e "\tPIA_PF=$PIA_PF ./connect_to_wireguard_with_token.sh${nc}" #
   echo
      fi #
   PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
   WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
-    # keep this file to get PREFERRED_REGION #
+    # keep this file to get PREFERRED_REGION later #
       #rm -f /opt/etc/piavpn-manual/latencyList #
   exit 0
 fi
@@ -303,6 +326,6 @@ if [[ $VPN_PROTOCOL == openvpn* ]]; then
     OVPN_HOSTNAME=$serverHostname \
     CONNECTION_SETTINGS=$VPN_PROTOCOL \
     ./connect_to_openvpn_with_token.sh
-  #rm -f /opt/etc/piavpn-manual/latencyList #
+  rm -f /opt/etc/piavpn-manual/latencyList
   exit 0
 fi

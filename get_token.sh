@@ -18,7 +18,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+##
 # modified for coreELEC/connman plgroves gmail 2022 #
+# hard coded/changed paths
+# reuse token within 24 hours
+# error messages to display or terminal
 
 # This function allows you to check if the required tools have been installed.
 check_tool() {
@@ -70,16 +74,37 @@ if [[ -z $PIA_USER || -z $PIA_PASS ]]; then
   exit 1
 fi
 
+  # check for existing token they are good for 24 hours! #
+    if [[ -s /opt/etc/piavpn-manual/token ]] #
+    then #
+         # https://stackoverflow.com/users/2318662/tharrrk #
+         m2n() { printf '%02d' $((-10+$(sed 's/./\U&/g;y/ABCEGLNOPRTUVY/60AC765A77ABB9/;s/./+0x&/g'<<<${1#?}) ));} #
+
+         tokenExpiration="$(awk 'NR==2{print $0; exit}' /opt/etc/piavpn-manual/token)" #
+         month="$(m2n "$(awk '{print $2}' <<< "${tokenExpiration}")")" #
+         expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenExpiration}"))" #
+         if (( $(date -d "+30 min" +%s) < $(date -d "${expiry_iso}" +%s) )) #
+         then echo "Previous token OK!" #
+         exit 0 #
+         fi #
+    fi #
+
 echo -n "Checking login credentials..."
 
 generateTokenResponse=$(curl -s -u "$PIA_USER:$PIA_PASS" \
   "https://www.privateinternetaccess.com/gtoken/generateToken")
 
 if [[ $(echo "$generateTokenResponse" | /opt/bin/jq -r '.status') != "OK" ]]; then #
+     if [[ -t 0 || -n "${SSH_TTY}" ]] #
+     then #
   echo
   echo
   echo -e "${red}Could not authenticate with the login credentials provided!${nc}"
   echo
+     else #
+          [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
+          for i in {1..8}; do _pia_notify "Could not authenticate "; sleep 4; done& disown #
+     fi #
   exit
 fi
 

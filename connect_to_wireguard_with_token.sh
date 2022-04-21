@@ -18,6 +18,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+##
+# modified for coreELEC/connman plgroves gmail 2022 #
+# hard coded/changed paths
+# converts wg-quick conf to connman config
+# add post_up.sh
 
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 255 #
@@ -139,18 +144,18 @@ echo -n "Trying to write /opt/etc/wireguard/pia.conf..." #
     mkdir -p /opt/etc/wireguard #
 echo "
 [Interface]
-Address = $(echo "$wireguard_json" | /opt/bin/jq -r '.peer_ip') #
+Address = $(echo "$wireguard_json" | /opt/bin/jq -r '.peer_ip')
 PrivateKey = $privKey
-ListenPort = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_port') #
+ListenPort = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_port')
 $dnsSettingForVPN
 [Peer]
 PersistentKeepalive = 25
-PublicKey = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_key') #
+PublicKey = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_key')
 AllowedIPs = 0.0.0.0/0
-Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | /opt/bin/jq -r '.server_port') #
+Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | /opt/bin/jq -r '.server_port')
 " > /storage/.opt/etc/wireguard/pia.conf || exit 1 # changed path #
 echo -e "${green}OK!${nc}"
-
+    echo #
   # THIS IS WHERE WE CONNECT and since wg-quick doesn't work #
   # we convert wireguard.conf to a connman config #
 
@@ -159,6 +164,7 @@ echo -e "${green}OK!${nc}"
   
   # Determine name of VPN used by CONNMAN #
     SERVICE=$( sed 's/\./_/g' <<< "vpn_${Endpoint%:*}") #
+    export SERVICE
 
     # write wireguard config #
     cat <<-EOF > /storage/.config/wireguard/pia.config
@@ -177,9 +183,9 @@ echo -e "${green}OK!${nc}"
 	EOF
 
 
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-foss-connman-connect/kodi_assets/functions
     [ -z "${kodi_user}" ] && source ./kodi_assets/functions
     REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )"
+
   # I placed this here for interactive use of these scripts #
   # CONNMAN_CONNECT is set true by systemd; AUTOCONNECT from environment #
   # what if AUTOCONNECT is set to false
@@ -190,8 +196,10 @@ echo -e "${green}OK!${nc}"
 #    [[ -t 0 || -n "${SSH_TTY}" ]]
     if [[ "${CONNMAN_CONNECT}" = "true" ]] || [[ "${AUTOCONNECT}" = "true" ]] #
     then echo "CONNMAN service ${SERVICE}! is ready" #
-    else # dialog to connect or not connect that is the question #
-         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         _pia_notify 'Connman config for '"${REGION}"' created'
+         sleep 2
+    else       # dialog to connect or not connect that is the question #
+         if [[ -t 0 || -n "${SSH_TTY}" ]] # skip dialog if running non-interactively #
          then echo -e "\nCONNMAN service ${SERVICE}! is ready" #
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
@@ -217,13 +225,13 @@ echo -e "${green}OK!${nc}"
                         echo #
                    exit 0 #
               fi #
-         else _pia_notify 'Connection is configured for '"${REGION}"' '
-              sleep 5
-              _pia_notify "Goto Settings > Coreelec > Connections"
+         else # running non-interactively send info to display
+              _pia_notify 'Connection is configured for '"${REGION}"' '
               sleep 4
-              _pia_notify "Goto Settings > Coreelec > Connections"
-              sleep 4
+              for i in {1..3}; do _pia_notify "Goto Settings > Coreelec > Connections"; sleep 4; done #
               _pia_notify "This precludes port forwarding and setting a safe firewall"
+              sleep 4
+              _pia_notify "Setting CONNMAN_CONNECT=true avoids this"
               exit 0
          fi
     fi #
@@ -238,7 +246,7 @@ echo -e "${green}OK!${nc}"
 
     To disconnect the VPN, run:
 
-    --> $(pwd)/shutdown.sh <--
+        $(pwd)/shutdown.sh
 "
          else
               _pia_notify 'Successfully connected to '"${REGION}"' '
@@ -270,7 +278,7 @@ sleep 2
     if [[ $PIA_DNS == "true" ]] #
     then # connman subordinates vpn dns to any preset nameservers #
          if [ "$(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf)" != "${DNS}" ] #
-         then echo "Replacing Connmans DNS with PIA DNS" #
+         then echo "Replacing Connman's DNS with PIA DNS" #
               sed -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
                      /etc/resolv.conf > r.c.n #
               cat r.c.n > /etc/resolv.conf && rm r.c.n #
@@ -278,15 +286,23 @@ sleep 2
          fi #
     fi #
 
+  # if called outside of systemd, then run ./post_up.sh
+    if [ -z "${PRE_UP_RUN+y}" ] #
+    then echo -e "Not called by system"
+         echo -e "calling post_up.sh\n"
+         ./post_up.sh > /dev/null &
+    fi
+
   # This section will exit the script if PIA_PF is not set to "true". #
   # the command for port forwarding will be sent to /tmp/port_forward.log #
     if [[ $PIA_PF != "true" ]] #
     then echo -e "    To enable port forwarding run\n" #, start the script:" #
-         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" #
+         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" > /tmp/port_forward.log #
          echo #
          echo -e "    The location used must be port forwarding enabled, or this will fail."
          echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
-         echo -e "\n    port_forwading.sh must be left running to maintain the port" #
+         echo -e "      and" #
+         echo -e "    port_forwading.sh must be left running to maintain the port" #
          echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background" #
          echo #
          exit 1 #
@@ -295,14 +311,7 @@ sleep 2
     echo "          logging port_forwarding.sh to /tmp/port_forward.log" #
 
     PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \
-    ./port_forwarding.sh > /tmp/port_forward.log &
-
-  # if I was called outside of systemd, then we need to run ./post_up.sh
-    if [ -z "${PRE_UP_RUN+y}" ] #
-    then echo "Not called by systemd"
-         echo calling post_up.sh
-         ./post_up.sh > /dev/null &
-    fi
+    ./port_forwarding.sh & >> /tmp/port_forward.log
 
 #############################################
  exit 0                                     #
