@@ -109,7 +109,7 @@ EOF
        # end at some point
          ((count++))
          [ "${count}" -gt "${max_count}" ] \
-         && { echo "Interwebs failed"; exit 1; }
+         && { logger "Interwebs failed"; exit 1; }
     done
 
   # stop portforwarding 
