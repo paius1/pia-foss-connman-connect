@@ -44,3 +44,4 @@
      fi
     done
     echo -e "\r All packages installed            \n"
+  exit 0

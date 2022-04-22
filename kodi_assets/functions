@@ -1,44 +1,11 @@
 #! /opt/bin/bash
-
+# c plgroves gmail 2022
 # pia-foss-wireguard kodi functions
   # credentials for local kodi
     kodi_user=kodi
     kodi_pass=
     kodi_host=localhost
     kodi_port=8080
-
-  #function _bash_REMATCH() { # Return specific data in matching line of
-      #local output match     # command output, file, or string
-      #is_SET_ "$3" \
-              #&& \
-                 #output="/tmp/${1##*/}-${3}"
-
-      #if is_EXECUTABLE_ "${1%% *}"
-      #then while IFS= read -r line
-           #do if [[ "${line}" =~ ${2} ]]
-              #then echo  "${BASH_REMATCH[1]}" \
-                      #| tee -a "${output:-/dev/null}"
-              #fi
-          #done < <(${1})
-      #elif is_FUNCTION_ "${1}"
-      #then [[ "${1}" =~ ${2} ]]
-           #for ((i=1;i<"${#BASH_REMATCH[@]}";i++))
-           #do  echo "${BASH_REMATCH[${i}]}"
-           #done
-      #elif is_READABLE_ "${1}"
-      #then echo -n "" > "${output:-/dev/null}"
-           #while IFS= read -r line
-           #do if [[ "${line}" =~ ${2} ]]
-              #then echo  "${BASH_REMATCH[1]}" \
-                      #| tee -a "${output:-/dev/null}"
-              #fi
-           #done < "${1}"
-      #else [[ "${1}" =~ ${2} ]]
-           #echo "${BASH_REMATCH[1]}"
-      #fi
-  #return 0
- #}
- #export -f _bash_REMATCH
 
   function _parse_JSON {
       local key=$1
@@ -72,5 +39,3 @@
       fi
  }
   export -f _pia_notify
-
-

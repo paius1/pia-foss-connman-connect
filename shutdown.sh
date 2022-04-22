@@ -4,9 +4,9 @@
 #                  or by System.Exec in Favourites
 #        
 #        disconnects from wireguard vpn
-#        restores the firewall, nameservers, stops port_forwarding.sh
+#        restores the firewall, nameservers, routing table, and stops port_forwarding.sh
 #        
-#        add any vpn sensitive applications e.g. transmission to stop
+#        add any vpn sensitive applications e.g. stop transmission
 #        at the end
 #        
 ####
