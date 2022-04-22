@@ -1,45 +1,72 @@
 # Manual PIA VPN Connections for Connman/coreELEC
 
-This repository take the scripts from https://github.com/pia-foss/manual-connections (slightly modified) and uses them to create a valid connman vpn config file for use with coreelec __TL/DR__:
+This repository take the scripts from https://github.com/pia-foss/manual-connections (slightly modified) and uses them to create a valid connman vpn config file for use with coreelec __TL/DR__:  
 
 ```
-git clone https://github.com/pia-foss/manual-connections.git
-cd pia-foss-connman-connect
-sudo ./run_setup.sh
+  git clone https://github.com/pia-foss/manual-connections.git
+  cd pia-foss-connman-connect
 ```
-
-Included is a systemd unit to automate a VPN connection
-
+  
+To install entware and required dependencies run:
+  
 ```
+  ./entware-installer.sh
+```
+  
+then
+  
+```
+  ./run_setup.sh
+```
+  
+  and follow the prompts.
+  
+  You should end up with a pia.config file in ~/.config/wireguard/pia.config,
+  and can connect by going to Settings>CoreELEC>Connections
+
+
+
+# Running with systemd
+Included is a systemd unit file to automate a VPN connection
+
 to run as a service you need:
 
   Predefined variables for the pia-foss manual connections scripts
   saved to:  /path/to/these/scripts/.env
   Without these the scripts run interactively and the unit will fail.
  
-# minimum file
+#### minimum .env file
                PIA_USER=pXXXXXXX
                PIA_PASS=p45sw0rdxx
-               PIA_PF='true|false'
-               PIA_DNS='true|false'
                AUTOCONNECT='false' # if set 'true' PREFERRED_REGION is ignored
-                                   # and the script must run thru all available servers
-                      # OR         # and takes a long... long... time
+                      # OR         # and the script must run thru all available servers
+                                   # and takes a long... long... time
                PREFERRED_REGION='aus_perth'
                                 # run PIA_PF='true|false' /path/to/scripts/get_region.sh
                                 # for valid options
-# optional: these are not part of pia-foss, and must be exported
+#### optional: some are not part of pia-foss, and must be exported
+               PIA_PF='true|false'
+               PIA_DNS='true|false'
                #export CONNMAN_CONNECT='true' # overcomes AUTOCONNECT's limitation,
-                                             # and is set in service unit
+                                             # and is set true by systemd
                #export MY_FIREWALL=/path/to/normal/iptables-save.file
                #export WG_FIREWALL=/path/to/wireguard/iptables-save.file
                
-  Edit: service file Replace /path/to/scripts with the actual path to scripts
-  Edit pre_up.sh , e.g. stop vpn dependent applications (transmission anyone)
-       post_up.sh
-       shutdown.sh
   
-  Copy pia-wireguard.service to /storage/.config/system.d/
+  Edit:
+  
+1. pia-wireguard.service file &ensp;&ensp;&ensp;&ensp;&ensp;Replace /path/to/scripts with the actual path to scripts  
+  
+3. pre_up.sh&emsp;&emsp;&emsp;&ensp;add any vpn dependent applications you need to start/stop,
+4. post_up.sh&nbsp;&emsp;&emsp;&emsp;e.g. transmission (anyone)
+5. shutdown.sh
+
+
+
+
+
+  Copy pia-wireguard.service to /storage/.config/system.d/  
+```
     systemctl daemon-reload
     systemctl enable pia-wireguard.service
     systemctl start pia-wireguard.service
@@ -47,15 +74,22 @@ to run as a service you need:
     journactl -f -u pia-wireguard.service
 
 ```
+#  To run from kodi Favourites:
+   from pia-foss-connman-connect/kodi_assets/  
+&emsp;&emsp;copy the xml in add_to_favourites.xml to ~/.kodi/userdate/favourites.xml  
+&emsp;&emsp;change the paths to the scripts and thumbnails i.e. .png files
+
+&ensp;reload kodi,  
 ```
-  To run from kodi Favourites: from /path/2/pia-foss-connman-connect/kodi_assets/
-                               copy the xml in add_to_favourites.xml to ~/.kodi/userdate/favourites.xml
-                               changing the paths to the scripts and thumbnails i.e. .png files
-                               reload your favourites, and enjoy.
+  systemctl restart kodi
 ```
-
-
-
+  
+&emsp;&emsp;&emsp;and enjoy.
+  
+  
+  
+  
+---
 FROM PIA-FOSS MANUAL-CONNECTIONS:
 
 The scripts were written so that they are easy to read and to modify. The code also has a lot of comments, so that you find all the information you might need. We hope you will enjoy forking the repo and customizing the scripts for your setup!
