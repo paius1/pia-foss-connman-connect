@@ -18,30 +18,31 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-##
+#####
 # modified for coreELEC/connman plgroves gmail 2022 #
-# hard coded/changed paths
-# added 1 second the curl timeout to ensure non-zero replies
-# added kodi OSNotifications
+# hard coded/changed paths #
+# added 1 second to the curl timeout to ensure non-zero replies #
+# added kodi OSNotifications #
 
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
-  # OSNotifications only want to run when PREFERED_REGION unset or AUTOCONNECT=true #
-# and -t 0 false #
+  # OSNotifications for errors #
 # shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
     [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
   # Only want to run when PREFERED_REGION unset or AUTOCONNECT=true #
   # and -t 0 false feedback for server search #
     if [[ "${IVE_RUN}" -eq 0 ]] || [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
     then # keep sending message while servers are being read quessed at 40 seconds #
-         dots='•••••••••' #
-         for i in {1..8} #
-         do _pia_notify 'Testing for fastest Servers •'"${dots:0:${i}}"'' #
-            sleep 4.9 #
-         done& disown #
+         if [[ ! -t 0 &&  ! -n "${SSH_TTY}" ]] # 
+            then dots='•••••••••' #
+                 for i in {1..8} #
+                 do _pia_notify 'Testing for fastest Servers •'"${dots:0:${i}}"'' #
+                 sleep 4.9 #
+            done& disown #
+         fi
     fi #
 
 # This function allows you to check if the required tools have been installed.
@@ -78,12 +79,8 @@ check_all_region_data() {
   fi
 
   # Notify the user that we got the server list.
-# is this really needed
-       # Called from command line not systemd service #
-         if [[ -t 0 || -n "${SSH_TTY}" ]]; then #
   echo -e "${green}OK!${nc}
   "
-         fi #
 }
 
 # Get all data for the selected region
@@ -93,15 +90,14 @@ get_selected_region_data() {
   /opt/bin/jq --arg REGION_ID "$selectedRegion" -r \
   '.regions[] | select(.id==$REGION_ID)')"
   if [[ -z $regionData ]]; then
-       # Called from command line #
          if [[ -t 0 || -n "${SSH_TTY}" ]] #
-         then #
+         then # RUNNING INTERACTIVELY #
     echo -e "${red}The REGION_ID $selectedRegion is not valid.${nc}
     "
-         else _pia_notify 'The REGION '"${selectedRegion}"' is not valid.'
-              sleep 5
-              # keep going in non-interactive mode
-                export MAX_LATENCY="${MAX_LATENCY:-0.05}"
+         else _pia_notify 'The REGION '"${selectedRegion}"' is not valid.' #
+              sleep 5 #
+              # keep going in non-interactive mode #
+                export MAX_LATENCY="${MAX_LATENCY:-0.05}" #
          fi #
     exit 1
   fi
@@ -219,9 +215,8 @@ if [[ $selectedRegion == "none" ]]; then
     .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   fi
       # Running thru server list takes a long time in a post-modem world
-# DEBUGGING remove ||  #
-        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] || [[ -t 0 || -n "${SSH_TTY}" ]]  #
-        then echo -e "\n\nrunning non-interactive\n PREFERRED_REGION ${PREFERRED_REGION}\n" #
+        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+        then echo "running non-interactively" #
         else #
   echo -e Testing regions that respond \
     faster than "${green}$MAX_LATENCY${nc}" seconds:
@@ -233,7 +228,7 @@ if [[ $selectedRegion == "none" ]]; then
 
   if [[ -z $selectedRegion ]]; then
 # MAX_LATENCY is too low #
-        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+        if [[ -t 0 || -n "${SSH_TTY}" ]] #
         then echo "running non-interactive No region responded" #
     echo -e "${red}No region responded within ${MAX_LATENCY}s, consider using a higher timeout."
     echo "For example, to wait 1 second for each region, inject MAX_LATENCY=1 like this:"
@@ -282,7 +277,7 @@ and port forwarding = ${PIA_PF}:
 
 ${green}WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
    PREFERRED_REGION='${bestServer_region}'
-"
+" #
      fi #
 fi
 

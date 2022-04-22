@@ -18,13 +18,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-##
-# modified for coreELEC/connman plgroves gmail 2022
-# started with https://github.com/thrnz/docker-wireguard-pia/blob/master/extra/pf.sh
-#   trap exit and fatal error
-# MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh
-#   bind_port_response payload_and_signature
-# added logging, saving port to file and adding to firewall
+####
+# modified for coreELEC/connman plgroves gmail 2022 #
+# started with https://github.com/thrnz/docker-wireguard-pia/blob/master/extra/pf.sh #
+#   trap exit and fatal error #
+# MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh #
+#   bind_port_response payload_and_signature #
+# added logging, saving port to file and adding to firewall #
 # 
 
   # PIA's scripts are set to a relative path #
@@ -87,10 +87,8 @@ fi
         printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
 }
 
-    log="${LOG:=/dev/null}" # export LOG to environment to monitor these scripts
-    #LOG="${1:-${log}}"
-    log='/tmp/port_forward.log'
-    LOG="${1:-${log}}"
+    log="${LOG:=/dev/null}" # export LOG to environment to monitor these scripts #
+    LOG="${1:-${log}}" #
     bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
 
   # An error with no recovery logic occured #
@@ -208,21 +206,21 @@ port=$(echo "$payload" | base64 -d | jq -r '.port')
 # 2 months is not enough for your setup, please open a ticket.
 expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
 
-    if [[ "${port}" =~ ^[0-9]+$ ]]
-    then
-          # Dump port to file if requested
+    if [[ "${port}" =~ ^[0-9]+$ ]] #
+    then #
+          # Dump port to file if requested #
           [ -n "$portfile" ] && { echo "${port}" > "$portfile" && \
-                                  logger "Port dumped to $portfile"; }
+                                  logger "Port dumped to $portfile"; } #
 
-        # add port to iptables
-          logger "adding peer port ${port} to firewall"
-          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT
+        # add port to iptables #
+          logger "adding peer port ${port} to firewall" #
+          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT #
 
 >&2 echo -ne "
 --> The port is ${green}$port${nc} and it will expire on ${red}$expires_at${nc}. <--
 
 Trying to bind the port... " #
-    fi
+    fi #
 # Now we have all required data to create a request to bind the port.
 # We will repeat this request every 15 minutes, in order to keep the port
 # alive. The servers have no mechanism to track your activity, so they
