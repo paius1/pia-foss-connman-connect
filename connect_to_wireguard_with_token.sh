@@ -188,18 +188,13 @@ echo -e "${green}OK!${nc}"
 
   # I placed this here for interactive use of these scripts #
   # CONNMAN_CONNECT is set true by systemd; AUTOCONNECT from environment #
-  # what if AUTOCONNECT is set to false
-  # also not -t 0 && -n "${SSH_TTY}" #
-#    non interactive
-#    [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
-#    interactive
-#    [[ -t 0 || -n "${SSH_TTY}" ]]
+  # AUTOCONNECT default false if run non-interactively
     if [[ "${CONNMAN_CONNECT}" = "true" ]] || [[ "${AUTOCONNECT}" = "true" ]] #
     then echo "CONNMAN service ${SERVICE}! is ready" #
-         _pia_notify 'Connman config for '"${REGION}"' created'
-         sleep 2
-    else       # dialog to connect or not connect that is the question #
-         if [[ -t 0 || -n "${SSH_TTY}" ]] # skip dialog if running non-interactively #
+         sleep 1
+      
+    else # Connection Dialog/Monologue
+         if [[ -t 0 || -n "${SSH_TTY}" ]] # skip Y/n dialog if running non-interactively #
          then echo -e "\nCONNMAN service ${SERVICE}! is ready" #
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
@@ -226,12 +221,11 @@ echo -e "${green}OK!${nc}"
                    exit 0 #
               fi #
          else # running non-interactively send info to display
-              _pia_notify 'Connection is configured for '"${REGION}"' '
-              sleep 4
-              for i in {1..3}; do _pia_notify "Goto Settings > Coreelec > Connections"; sleep 4; done #
-              _pia_notify "This precludes port forwarding and setting a safe firewall"
-              sleep 4
-              _pia_notify "Setting CONNMAN_CONNECT=true avoids this"
+                _pia_notify 'Saved configuration for '"${REGION}"' '; sleep 4
+                _pia_notify "Goto Settings>Coreelec>Connections" 10000; sleep 10
+                _pia_notify "This precludes port forwarding and setting a safe firewall" ; sleep 5
+                _pia_notify "This precludes port forwarding and setting a safe firewall" ; sleep 5
+                _pia_notify "Set CONNMAN_CONNECT=true to avoid this" 10000
               exit 0
          fi
     fi #
@@ -248,21 +242,27 @@ echo -e "${green}OK!${nc}"
 
         $(pwd)/shutdown.sh
 "
+# DEBUGGIN OSNotify
+_pia_notify 'Successfully connected to '"${REGION}"' '
          else
               _pia_notify 'Successfully connected to '"${REGION}"' '
          fi
+
 sleep 2
-    echo "Setting up firewall" #
-         #                       SYSTEM START?           #
-         if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
-         then echo taking 3 #
 #####################################################################
 # Remember to check /storage/.config/autostart.sh for any conflicts #
 #####################################################################
-              lsmod | grep -q '^ip_tables' || echo ip_tables module not loaded #
-              lsmod | grep -q '^ip_tables' || modprobe ip_tables #
-              sleep 3 #
-              lsmod | grep -q '^ip_tables' && echo -e "\nip_tables module loaded\n" #
+    echo "Setting up firewall" #
+       # SYSTEM START #
+         if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
+         then echo taking 3 #
+              if ! lsmod | grep -q '^ip_tables'
+              then echo ip_tables module not loaded #
+                   modprobe ip_tables #
+                   sleep 1 #
+              fi
+              lsmod | grep -q '^ip_tables' \
+              && echo -e "\nip_tables module loaded\n" #
          fi
 
   # Iptables-restore vpn killswitch #
@@ -274,14 +274,14 @@ sleep 2
          exit 255 #
     fi
 
-  # added this section to check and set nameservers since not using wg-quick
+  # Check and reset nameservers set by connmanctl
     if [[ $PIA_DNS == "true" ]] #
     then # connman subordinates vpn dns to any preset nameservers #
          if [ "$(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf)" != "${DNS}" ] #
          then echo "Replacing Connman's DNS with PIA DNS" #
               sed -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
-                     /etc/resolv.conf > r.c.n #
-              cat r.c.n > /etc/resolv.conf && rm r.c.n #
+                     /etc/resolv.conf > /tmp/resolv.conf #
+              cat /tmp/resolv.conf > /etc/resolv.conf && rm /tmp/resolv.conf #
               echo
          fi #
     fi #
@@ -289,7 +289,7 @@ sleep 2
   # if called outside of systemd, then run ./post_up.sh
     if [ -z "${PRE_UP_RUN+y}" ] #
     then echo -e "Not called by system"
-         echo -e "calling post_up.sh\n"
+         echo -e "calling $(pwd)/post_up.sh\n"
          ./post_up.sh > /dev/null &
     fi
 
@@ -297,7 +297,7 @@ sleep 2
   # the command for port forwarding will be sent to /tmp/port_forward.log #
     if [[ $PIA_PF != "true" ]] #
     then echo -e "    To enable port forwarding run\n" #, start the script:" #
-         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" > /tmp/port_forward.log #
+         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" > /tmp/port_forward.cmd #
          echo #
          echo -e "    The location used must be port forwarding enabled, or this will fail."
          echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
@@ -305,13 +305,14 @@ sleep 2
          echo -e "    port_forwading.sh must be left running to maintain the port" #
          echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background" #
          echo #
-         exit 1 #
+         exit 0 #
     fi #
 
     echo "          logging port_forwarding.sh to /tmp/port_forward.log" #
+         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" | tee /tmp/port_forward.log #
 
     PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \
-    ./port_forwarding.sh & >> /tmp/port_forward.log
+    ./port_forwarding.sh >> /tmp/port_forward.log &
 
 #############################################
  exit 0                                     #

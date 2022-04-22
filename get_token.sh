@@ -24,6 +24,11 @@
 # reuse token within 24 hours
 # error messages to display or terminal
 
+  # PIA's scripts are set to a relative path #
+    cd "${0%/*}" || exit 255 #
+
+    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
+
 # This function allows you to check if the required tools have been installed.
 check_tool() {
   cmd=$1
@@ -85,8 +90,9 @@ fi
          expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenExpiration}"))" #
          if (( $(date -d "+30 min" +%s) < $(date -d "${expiry_iso}" +%s) )) #
          then echo "Previous token OK!" #
-         exit 0 #
+              exit 0 #
          fi #
+    else echo "token expired retrieving a new one"
     fi #
 
 echo -n "Checking login credentials..."
@@ -103,7 +109,7 @@ if [[ $(echo "$generateTokenResponse" | /opt/bin/jq -r '.status') != "OK" ]]; th
   echo
      else #
           [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
-          for i in {1..8}; do _pia_notify "Could not authenticate "; sleep 4; done& disown #
+          _pia_notify "Could not authenticate " '15000' &
      fi #
   exit
 fi

@@ -22,11 +22,27 @@
 # modified for coreELEC/connman plgroves gmail 2022 #
 # hard coded/changed paths
 # added 1 second the curl timeout to ensure non-zero replies
+# added kodi OSNotifications
 
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
+
+  # OSNotifications only want to run when PREFERED_REGION unset or AUTOCONNECT=true #
+# and -t 0 false #
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
+    [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
+  # Only want to run when PREFERED_REGION unset or AUTOCONNECT=true #
+  # and -t 0 false feedback for server search #
+    if [[ "${IVE_RUN}" -eq 0 ]] || [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
+    then # keep sending message while servers are being read quessed at 40 seconds #
+         dots='•••••••••' #
+         for i in {1..8} #
+         do _pia_notify 'Testing for fastest Servers •'"${dots:0:${i}}"'' #
+            sleep 4.9 #
+         done& disown #
+    fi #
 
 # This function allows you to check if the required tools have been installed.
 check_tool() {
@@ -46,17 +62,18 @@ check_tool() {
 
 # If the server list has less than 1000 characters, it means curl failed.
 check_all_region_data() {
-# IS this really needed
+    echo
+    echo -n "Getting the server list..."
+
+  if [[ ${#all_region_data} -lt 1000 ]]; then
        # Called from command line not systemd service #
          if [[ -t 0 || -n "${SSH_TTY}" ]] #
          then #
-    echo
-    echo -n "Getting the server list..."
-         fi #
-  if [[ ${#all_region_data} -lt 1000 ]]; then
     echo -e "${red}Could not get correct region data. To debug this, run:"
     echo "$ curl -v $serverlist_url"
     echo -e "If it works, you will get a huge JSON as a response.${nc}"
+         else _pia_notify "Could not get correct region data." 15000 #
+         fi #
     exit 1
   fi
 
@@ -76,8 +93,16 @@ get_selected_region_data() {
   /opt/bin/jq --arg REGION_ID "$selectedRegion" -r \
   '.regions[] | select(.id==$REGION_ID)')"
   if [[ -z $regionData ]]; then
+       # Called from command line #
+         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         then #
     echo -e "${red}The REGION_ID $selectedRegion is not valid.${nc}
     "
+         else _pia_notify 'The REGION '"${selectedRegion}"' is not valid.'
+              sleep 5
+              # keep going in non-interactive mode
+                export MAX_LATENCY="${MAX_LATENCY:-0.05}"
+         fi #
     exit 1
   fi
 }
@@ -105,7 +130,8 @@ fi
   # changed the path #
     mkdir -p /opt/etc/piavpn-manual #
 # Erase old latencyList file
-    rm -f /opt/etc/piavpn-manual/latencyList #
+    # Save for use later
+    # rm -f /opt/etc/piavpn-manual/latencyList #
     touch /opt/etc/piavpn-manual/latencyList #
 
 # This allows you to set the maximum allowed latency in seconds.
@@ -138,11 +164,10 @@ printServerLatency() {
     "http://$serverIP:443")
   if [[ $? -eq 0 ]]; then # successful connection #
 
-            # compare time to MAX_LATENCY #
+            # compare time <= MAX_LATENCY  and add to list #
             if awk "BEGIN {exit !($MAX_LATENCY >= $time)}" #
             then #
 
->&2 echo "Got latency ${time}s for PREFERRED_REGION='${REGION}' ${regionName}" #
     echo "$time $regionID $serverIP"
     # Write a list of servers with acceptable latency
     # to /opt/etc/piavpn-manual/latencyList #
@@ -194,11 +219,9 @@ if [[ $selectedRegion == "none" ]]; then
     .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   fi
       # Running thru server list takes a long time in a post-modem world
-        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
-        then echo "running non-interactive PREFERRED_REGION unset" #
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
-             [ -z "${kodi_user}" ] && source ./kodi_assets/functions || exit 255 #
-             for i in {1..8}; do _pia_notify "Testing for fastest Servers"; sleep 4; done& disown #
+# DEBUGGING remove ||  #
+        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] || [[ -t 0 || -n "${SSH_TTY}" ]]  #
+        then echo -e "\n\nrunning non-interactive\n PREFERRED_REGION ${PREFERRED_REGION}\n" #
         else #
   echo -e Testing regions that respond \
     faster than "${green}$MAX_LATENCY${nc}" seconds:
@@ -212,13 +235,11 @@ if [[ $selectedRegion == "none" ]]; then
 # MAX_LATENCY is too low #
         if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
         then echo "running non-interactive No region responded" #
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
-             [ -z "${kodi_user}" ] && { source ./kodi_assets/functions || echo failed; } #
-             for i in {1..3}; do _pia_notify "No region responded in ${MAX_LATENCY}s. Set a higher MAX_LATENCY."; sleep 4; done #
-        else #
     echo -e "${red}No region responded within ${MAX_LATENCY}s, consider using a higher timeout."
     echo "For example, to wait 1 second for each region, inject MAX_LATENCY=1 like this:"
     echo -e "$ MAX_LATENCY=1 ./get_region.sh${nc}"
+        else #
+             _pia_notify "No region responded in ${MAX_LATENCY}s.\n\tSet a higher MAX_LATENCY." 15000
         fi #
     exit 1
   else
@@ -226,7 +247,7 @@ if [[ $selectedRegion == "none" ]]; then
 found in at : ${green}/opt/etc/piavpn-manual/latencyList${nc} #
 "
   fi
-else
+else # PREFERRED_REGION selectedRegion != none #
   selectedOrLowestLatency="selected"
   check_all_region_data
 fi

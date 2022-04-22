@@ -33,7 +33,7 @@
 
   # check for required entware packages or install
     install="/opt/bin/opkg install "
-    Packages=('bash' 'coreutils-sort' 'curl' 'jq' 'grep' 'iptables' 'sed' 'wireguard-tools'  )
+    Packages=('bash' 'coreutils-sort' 'curl' 'date' 'jq' 'grep' 'iptables' 'sed' 'wireguard-tools'  )
     mapfile -t Installed < <(/opt/bin/opkg list-installed | awk '{print $1}')
     for package in "${Packages[@]}"; do
      if [[  " ${Installed[@]} " =~ " $package " ]]

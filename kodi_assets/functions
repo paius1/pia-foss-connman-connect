@@ -57,9 +57,14 @@
 
 # ALL that to get to this
   function _pia_notify() {
-      local message="${1:-message is empty}"
+      local message displaytime image show_image
+            message="${1:-message is empty}"
+            displaytime="${2:-5000}"
+            image="${3:-"kodi_assets/pia_on_48x48.png"}"
+            [[ -s "$(pwd)/${image}" ]] \
+            && showimage=',"image":"'"$(pwd)/${image}"'"'
 
-      status="$(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" }, "id": 1} ')"
+      status="$(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${showimage}"' }, "id": 1} ')"
 
       if  [[ "$status" =~ OK ]]
       then return 0
@@ -68,14 +73,4 @@
  }
   export -f _pia_notify
 
-  #function _player_INFO() {
-      #local match
-            #match='^.*playerid":([[:digit:]]).*type":"([[:alpha:]]+)'
-      
-      #[[ $(kodi_REQ_ '{ "jsonrpc":"2.0","method":"Player.GetActivePlayers","id":"99"}') \
-                     #=~ \
-                     #${match} ]] \
-                                 #&& \
-                                     #PLAYERID="${BASH_REMATCH[1]}"
- #}
- #export -f _player_INFO
+

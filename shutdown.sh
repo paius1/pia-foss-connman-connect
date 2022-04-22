@@ -49,15 +49,22 @@
          fi
     fi
 
-    [ -z "${kodi_user}" ] && source ./kodi_assets/functions
+  # stop running run_setup.sh's #
+    pids=($(pidof run_setup.sh)) #
+    if [ "${#pids[@]}" -gt 0 ] #
+    then # remove this instance from pids[@] #
+         logger "run_setup.sh is already running, will stop" #
+         echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
+    fi
 
+    [ -z "${kodi_user}" ] && source ./kodi_assets/functions
     REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )"
   # disconnect VPN
-    logger "Disconnecting from ${REGION}"
+    logger 'Disconnecting from '"${REGION}"''
     connmanctl disconnect "$(grep vpn_ < <( connmanctl services) | awk '{print $NF}')"
 
-    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] && \
-    _pia_notify 'Disconnected from '"${REGION}"' '
+    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
+    && _pia_notify 'Disconnected from '"${REGION}"' '
 
 # OKAY now iptables, DNS are all mangled?
 
@@ -70,7 +77,7 @@
     iptables-restore < "${MY_FIREWALL:-openrules.v4}"
 
   # restore a sane DNS .cache/starting_resolv.conf is saved at startup
-    logger "restoring sane nameservers"
+    logger "restoring DNS nameservers"
     if [ -f /storage/.cache/starting_resolv.conf ]
     then cat /storage/.cache/starting_resolv.conf > /etc/resolv.conf
     else logger "no preexisting resolv.conf winging it"
@@ -91,6 +98,7 @@ EOF
     if [ "${#pf_pids[@]}" -ne 0 ]
     then logger "Stopping port forwarding"
          echo "${pf_pids[@]}" | xargs kill -9 >/dev/null 2>&1
+         > /tmp/port_forward.log
     fi
 
 # add anything else such stopping applications and port forwarding

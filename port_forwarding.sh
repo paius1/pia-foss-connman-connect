@@ -27,21 +27,6 @@
 # added logging, saving port to file and adding to firewall
 # 
 
-  # replace any currently running port_forwarding.sh's #
-    pids=($(pidof port_forwarding.sh)) #
-    mypid=$$ #
-
-    if [ "${#pids[@]}" -gt 1 ] #
-    then # remove this instance from pids[@] #
-         logger "port_forwarding.sh is already running, will stop other" #
-         for i in "${!pids[@]}" #
-         do if [ "${pids[$i]}" == "$mypid" ] #
-            then unset pids[$i] #
-            fi #
-         done #
-         echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
-    fi #
-
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" #
 
@@ -103,6 +88,8 @@ fi
 }
 
     log="${LOG:=/dev/null}" # export LOG to environment to monitor these scripts
+    #LOG="${1:-${log}}"
+    log='/tmp/port_forward.log'
     LOG="${1:-${log}}"
     bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
 
@@ -123,9 +110,26 @@ fi
   # Handle shutdown behavior
     finish () { #
       logger "Port forward rebinding stopped. The port will likely close soon." #
+        # remove port from iptables
+          iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
       exit 0 #
  }
     trap finish SIGTERM SIGINT SIGQUIT #
+
+  # replace any currently running port_forwarding.sh's #
+    pids=($(pidof port_forwarding.sh)) #
+    mypid=$$ #
+
+    if [ "${#pids[@]}" -gt 1 ] #
+    then # remove this instance from pids[@] #
+         logger "port_forwarding.sh is already running, will stop other" #
+         for i in "${!pids[@]}" #
+         do if [ "${pids[$i]}" == "$mypid" ] #
+            then unset pids[$i] #
+            fi #
+         done #
+         echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
+    fi #
 
   # wait for privateinternetaccess this could be an infinite loop #
     until ping -c 1 -W 1  privateinternetaccess.com > /dev/null 2>&1 #

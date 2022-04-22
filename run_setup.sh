@@ -38,6 +38,28 @@
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
+  # replace any currently running run_setup.sh's #
+  # this can be a problem for non-interactive runs #
+    pids=($(pidof run_setup.sh)) #
+    mypid=$$ #
+
+    if [ "${#pids[@]}" -gt 1 ] #
+    then # remove $mypid instance from pids[@] #
+         echo "run_setup.sh is already running, will stop other" #
+         for i in "${!pids[@]}" #
+         do if [ "${pids[$i]}" == "$mypid" ] #
+            then unset pids[$i] #
+            fi #
+         done #
+         echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
+    fi #
+
+  # kodi notifications with timeouts and images#
+  # first argument is the message, second display time, third image file #
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
+    [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
+    BOTHER=14000 # display time in ms for important notifications #
+  # kodi won't wait this long so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
 
   # systemd checks for non empty .env file #
   #     ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env & $PRE_UP_RUN #
@@ -45,10 +67,10 @@
     then source .env  # || no environment #
     elif [[ -t 0 || -n "${SSH_TTY}" ]] # do i notify to terminal or screen #
          then echo "Get ready to rumble" # we can interact so no need for .env #
-         else   # no .env file, not running interactively,  #
-                # send an error notification and exit #
-              _notify_kodi "No valid PIA config -> $(pwd)/.env" '6' || exit 255 #
-              _notify_kodi "CONNECTION FAILED" #
+         else # no .env file, not running interactively,  #
+              _pia_notify "No valid PIA config -> $(pwd)/.env" "${BOTHER}" #
+              sleep "$((BOTHER/1000))"
+              _pia_notify "CONNECTION FAILED" "${BOTHER}" # "$((BOTHER/2))" #
               exit 1 #
     fi #
 
@@ -84,32 +106,15 @@
     if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
     then echo "running non-interactive kit check" #
 
-        # kodi notifications with increased timeouts #
-        # first argument is the message, second ups the display time #
-          function _notify_kodi() { #
-              local message="$1" #
-              local times="{1..${2:-1}}" #
-
-              [ -z "${kodi_user}" ] && { source ./kodi_assets/functions || return 255; } #
-
-              # let's make sure we get noticed send $times #
-                for i in $(eval echo "${times}") #
-                do #
-                    _pia_notify "${i} ${message}" || return 1 #
-                    sleep 4 # I think this is less than the standard kodi notification timeout #
-                done #
-      } #
-
         function _is_empty() { [[ -z "${1}" ]]; } #
 
-        BOTHER=3 # repeat IMPORTANT NOTIFICATIONS #
-
         if #
-        _is_empty "${PIA_USER}" ||  
-        _is_empty "${PIA_PASS}" 
+       _is_empty "${PIA_USER}" ||  
+       _is_empty "${PIA_PASS}" #
         then # if these are empty we can forget it #
-             _notify_kodi "Missing PIA Credentials" "${BOTHER}" || exit 255 #
-             _notify_kodi "CONNECTION FAILED" #
+             _pia_notify "Missing PIA Credentials" "${BOTHER}" #
+             sleep "$((BOTHER/1000+1))" #
+             _pia_notify "CONNECTION FAILED" #
              exit 1 #
         fi #
 
@@ -125,60 +130,37 @@
 
                  function _AUTOCONNECT_or_PREFERRED_REGION() { #
                      if [[ "${AUTOCONNECT}" =~ ^t ]] #
-                     then _notify_kodi 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "${BOTHER}" >/dev/null #
+                     then echo "the fastest server"
+                          _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "8000" >/dev/null #
+                          sleep 8
                      else echo "${PREFERRED_REGION}" #
                      fi #
-               }
-
-                 case "${CONNMAN_CONNECT}x" in #
-                      t*) # CONNMAN_CONNECT=true is PREFERRED_REGION set # 
-                          AUTOCONNECT="${AUTOCONNECT:-false}" # Keep AUTOCONNECT
-                          if ! _is_empty "${PREFERRED_REGION}" #
-                          then  # NOTIFY OF AUTOCONNECT PREFERRED_REGION CONFLICT #
-                                via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
-                          else # PREFERRED_REGION not set #
-                               [[ "${AUTOCONNECT}" =~ ^f ]] \
-                               && MAX_LATENCY="${MAX_LATENCY:=0.5}" #
-                               via="with fastest server" #
-                          fi #
-                      ;; #
-                      f*) # CONNMAN_CONNECT=false is PREFERRED_REGION set #
-                          AUTOCONNECT="${AUTOCONNECT:-false}" # Keep AUTOCONNECT
-                          if ! _is_empty "${PREFERRED_REGION}" #
-                          then # NOTIFY OF AUTOCONNECT PREFERRED_REGION CONFLICT #
-                               via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
-                          else # PREFERRED_REGION not set #
-                               [[ "${AUTOCONNECT}" =~ ^f ]] \
-                               && MAX_LATENCY="${MAX_LATENCY:=0.5}" #
-                               via="with fastest server" #
-                          fi #
-                      ;; #
-                      *)  # CONNMAN_CONNECT unset is PREFERRED_REGION set # 
-                          echo "PREFERRED_REGION or MAX_LATENCY must be set" # OR DO THEY
-                          AUTOCONNECT="${AUTOCONNECT:-false}" # Keep AUTOCONNECT
-                          if ! _is_empty "${PREFERRED_REGION}" #
-                          then # NOTIFY OF AUTOCONNECT PREFERRED_REGION CONFLICT #
-                                via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
-                          else # PREFERRED_REGION not set #
-                               [[ "${AUTOCONNECT}" =~ ^f ]] \
-                               && MAX_LATENCY="${MAX_LATENCY:=0.5}" #
-                               via="with fastest server" #
-                          fi #
-                      ;; #
-                 esac #
+                }
+             # Set AUTOCONNECT="${AUTOCONNECT:-false}" and go from there
+               AUTOCONNECT="${AUTOCONNECT:-false}" # Keep AUTOCONNECT if set
+               if ! _is_empty "${PREFERRED_REGION}" #
+               then  # NOTIFY OF AUTOCONNECT PREFERRED_REGION CONFLICT #
+                     via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
+               else # PREFERRED_REGION not set #
+                    [[ "${AUTOCONNECT}" =~ ^f ]] \
+                    && MAX_LATENCY="${MAX_LATENCY:=0.05}" #
+                    via="the fastest server" #
+               fi #
           fi #
+# BOTHER ABOUT REGION UNSET BECAUSE IT MAKE THE SCRIPT TAKE A LONG TIME?!
+ _is_empty   "${PREFERRED_REGION}" && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}"; sleep "$((BOTHER/1000))"; }
 
         # let handle dns & port forwarding differently i.e. notify change #
           if _is_empty "${PIA_PF}" #
           then PIA_PF='false' #
-               _notify_kodi "Port Forwarding disabled" #
+#               _pia_notify "Port Forwarding disabled" #
           fi #
           if _is_empty "${PIA_DNS}" #
           then PIA_DNS='true' #
-               _notify_kodi "FORCED PIA DNS" #
+               _pia_notify "FORCED PIA DNS" #
+               sleep 4
           fi #
 
-        _notify_kodi 'Connecting to PIA '"${via}"'' #
     fi #
 
   # setup sane environment, PRE_UP_RUN is set in systemd.unit file
@@ -188,6 +170,8 @@
          echo > "${LOG}" #
          ./pre_up.sh #
     fi #
+
+    _pia_notify 'getting details for '"${via}"'' #
 
 # end of major changes
 ########################################################################
@@ -217,7 +201,9 @@ fi
 
     # Erase previous authentication token if present
     # changed paths from /opt/ #
-    rm -f /opt/etc/piavpn-manual/token /opt/etc/piavpn-manual/latencyList #
+    # and commented files may be useful later
+    #rm -f /opt/etc/piavpn-manual/token /opt/etc/piavpn-manual/latencyList #
+    rm -f /opt/etc/piavpn-manual/latencyList #
 
 # Retry login if no token is generated
 while :; do
@@ -441,7 +427,7 @@ For example, you can try 0.2 for 200ms allowed latency.
 # why are we messing with VPN_PROTOCOL #
 #      VPN_PROTOCOL="no" #
 #      export VPN_PROTOCOL #
-            VPN_PROTOCOL=no ./get_region.sh 2>/dev/null #
+            VPN_PROTOCOL=no IVE_RUN=0 ./get_region.sh 2>/dev/null #
 
       if [[ -s /opt/etc/piavpn-manual/latencyList ]]; then #
         # Output the ordered list of servers that meet the latency specification $MAX_LATENCY
@@ -488,16 +474,18 @@ For example, you can try 0.2 for 200ms allowed latency.
         export PREFERRED_REGION
         echo
         break
-            else echo "running non-interactive got ordered list" #
-                 # choose best region and proceed
-                   PREFERRED_REGION=$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList ) #
-                   REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )" #
-                   export PREFERRED_REGION #
-
-                   _pia_notify 'Configuring for '"${REGION}"'' #
-
-            fi #
+                else echo "running non-interactively got ordered list choosing fastest" #
+                     # choose best region and proceed
+                       PREFERRED_REGION=$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList ) #
+                       REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )" #
+                       export PREFERRED_REGION #
+                       _pia_notify 'Selected for '"${REGION}"'' #
+                fi #
       else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
+           if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+           then # running non-interactively
+                _pia_notify "No Available Servers Found!" "${BOTHER}"
+           fi
         exit 1
       fi
     else
@@ -508,8 +496,8 @@ For example, you can try 0.2 for 200ms allowed latency.
   else
     # Validate in-line declaration of PREFERRED_REGION; if invalid remove input to initiate prompts
     echo "Region input is : $PREFERRED_REGION"
-    export PREFERRED_REGION
-                VPN_PROTOCOL=no ./get_region.sh 2>/dev/null #
+    export PREFERRED_REGION # added IVE_RUN to supress notify_kodi #
+                VPN_PROTOCOL=no IVE_RUN='1' ./get_region.sh 2>/dev/null #
     if [[ $? != 1 ]]; then
       break
     fi
@@ -601,4 +589,5 @@ echo -e "${green}PIA_DNS=$PIA_DNS${nc}"
 CONNECTION_READY="true"
 export CONNECTION_READY
 
-./get_region.sh 2>/dev/null #
+    # added IVE_RUN to supress notify_kodi #
+    IVE_RUN=2 ./get_region.sh 2>/dev/null #
