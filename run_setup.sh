@@ -19,18 +19,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 ##
-# modified for coreELEC/connman plgroves gmail 2022
-# grep -n '\#$' *.sh to view changes
-# FORCED PROTOCOL TO Wireguard
-# changed path from /opt to /opt/etc
-# added kodi onscreen notifications
-# added variable check when run as a service
-# save token file and latency list for later use
-# forced DISABLE_IPV6
-# ignored resolvconf dependency
-########################################################################
+# modified for coreELEC/connman plgroves gmail 2022 #
+# grep -n '\#$' *.sh to view changes #
+# FORCED VPN_PROTOCOL TO Wireguard #
+# changed path from /opt to /opt/etc #
+# added kodi onscreen notifications #
+# added variable check when run as a service #
+# save token file and latency list for later use #
+# forced DISABLE_IPV6 #
+# ignored resolvconf dependency #
 #
-# PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd AUTOCONNECT=true PIA_DNS-true|false PIA_PF=true|false ./run_setup.sh 
+####
+# to run without interaction
+# PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd AUTOCONNECT=true PIA_DNS=true|false PIA_PF=true|false ./run_setup.sh 
 # the more variables you set the less interactive
 
   # PIA's scripts are set to a relative path #
@@ -54,20 +55,20 @@
          echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
     fi #
 
-  # kodi notifications with timeouts and images#
+  # kodi notifications with timeouts and images #
   # first argument is the message, second display time, third image file #
 # shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
     [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
-    BOTHER=14000 # display time in ms for important notifications #
   # kodi won't wait this long so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
+    BOTHER=14000 # display time in ms for important notifications #
 
-  # systemd checks for non empty .env file #
+  # systemd checks for non empty .env file, so should we #
   #     ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env & $PRE_UP_RUN #
     if [ -s .env ] #
     then source .env  # || no environment #
-    elif [[ -t 0 || -n "${SSH_TTY}" ]] # do i notify to terminal or screen #
+    elif [[ -t 0 || -n "${SSH_TTY}" ]] # notify to terminal #
          then echo "Get ready to rumble" # we can interact so no need for .env #
-         else # no .env file, not running interactively,  #
+         else # no .env file, not running interactively #
               _pia_notify "No valid PIA config -> $(pwd)/.env" "${BOTHER}" #
               sleep "$((BOTHER/1000))"
               _pia_notify "CONNECTION FAILED" "${BOTHER}" # "$((BOTHER/2))" #
@@ -109,24 +110,24 @@
         function _is_empty() { [[ -z "${1}" ]]; } #
 
         if #
-       _is_empty "${PIA_USER}" ||  
-       _is_empty "${PIA_PASS}" #
-        then # if these are empty we can forget it #
+        _is_empty "${PIA_USER}" ||  
+        _is_empty "${PIA_PASS}" #
+        then # NO CREDENTIALS, we can forget it #
              _pia_notify "Missing PIA Credentials" "${BOTHER}" #
              sleep "$((BOTHER/1000+1))" #
              _pia_notify "CONNECTION FAILED" #
              exit 1 #
         fi #
 
-        # PREFERRED_REGION|AUTOCONNECT will create a connection config #
+        # PREFERRED_REGION|AUTOCONNECT will create a connman config #
         # AUTOCONNECT|CONNMAN_CONNECT != false|null requires using Settings > CoreELEC > Connections #
         #   and sets no firewall or port forwarding #
         #
           if #
-            _is_empty "${PREFERRED_REGION}" ||  
-            _is_empty "${AUTOCONNECT}" ||  
-            _is_empty "${MAX_LATENCY}" #
-          then # if these are empty we can try CONNMAN_CONNECT#
+          _is_empty "${PREFERRED_REGION}" ||  
+          _is_empty "${AUTOCONNECT}" ||  
+          _is_empty "${MAX_LATENCY}" #
+          then # let's set them #
 
                  function _AUTOCONNECT_or_PREFERRED_REGION() { #
                      if [[ "${AUTOCONNECT}" =~ ^t ]] #
@@ -147,26 +148,27 @@
                     via="the fastest server" #
                fi #
           fi #
-# BOTHER ABOUT REGION UNSET BECAUSE IT MAKE THE SCRIPT TAKE A LONG TIME?!
- _is_empty   "${PREFERRED_REGION}" && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}"; sleep "$((BOTHER/1000))"; }
+
+        # BOTHER ABOUT REGION UNSET BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?!
+          _is_empty   "${PREFERRED_REGION}" && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}"; sleep "$((BOTHER/1000))"; }
 
         # let handle dns & port forwarding differently i.e. notify change #
           if _is_empty "${PIA_PF}" #
           then PIA_PF='false' #
-#               _pia_notify "Port Forwarding disabled" #
+#                 _pia_notify "Port Forwarding disabled" #
           fi #
           if _is_empty "${PIA_DNS}" #
           then PIA_DNS='true' #
                _pia_notify "FORCED PIA DNS" #
                sleep 4
           fi #
-
     fi #
 
-  # setup sane environment, PRE_UP_RUN is set in systemd.unit file
+  # setup sane environment, PRE_UP_RUN is set in systemd.unit file #
     if [ -z "${PRE_UP_RUN+y}" ] #
     then echo "Setting up sane environment" #
-         export LOG=/tmp/pia-wireguard.log #
+         # for debugging scripts added to pia-foss/manual-connections #
+           export LOG=/tmp/pia-wireguard.log #
          echo > "${LOG}" #
          ./pre_up.sh #
     fi #
@@ -201,7 +203,7 @@ fi
 
     # Erase previous authentication token if present
     # changed paths from /opt/ #
-    # and commented files may be useful later
+    # and commented rm token as it can be used for 24 hrs #
     #rm -f /opt/etc/piavpn-manual/token /opt/etc/piavpn-manual/latencyList #
     rm -f /opt/etc/piavpn-manual/latencyList #
 
@@ -270,10 +272,11 @@ while :; do
     PIA_USER=""
     PIA_PASS=""
   else
+          # read from saved token file
             PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token ) #
     export PIA_TOKEN
-# token is goog for 24 hours according to PIA
-    #rm -f /opt/etc/piavpn-manual/token
+# token is good for 24 hours according to PIA #
+    #rm -f /opt/etc/piavpn-manual/token #
     break
   fi
 done
@@ -321,6 +324,7 @@ ${green}Defaulting to yes.${nc}
   echo "sysctl -w net.ipv6.conf.all.disable_ipv6=0"
   echo "sysctl -w net.ipv6.conf.default.disable_ipv6=0"
   echo -e "${nc}"
+     else _pia_notify "IPv6 has been disabled" #
      fi #
   sysctl -w net.ipv6.conf.all.disable_ipv6=1
   sysctl -w net.ipv6.conf.default.disable_ipv6=1
@@ -361,7 +365,7 @@ else
   selectServer="no"
 fi
   # pia-foss manual connections does not export AUTOCONNECT #
-  # because it is assumed #
+  # do we need to  #
     export AUTOCONNECT #
 # Prompt the user to specify a server or auto-connect to the lowest latency
 while :; do
@@ -392,7 +396,7 @@ For example, you can try 0.2 for 200ms allowed latency.
       fi
 
       # Assure that input is numeric and properly formatted.
-# Check this  latencyInput=$MAX_LATENCY then MAX_LATENCY=$latencyInput
+# Check this  latencyInput=$MAX_LATENCY then MAX_LATENCY=$latencyInput #
       MAX_LATENCY=0.05
       while :; do
         if [[ -z $latencyInput ]]; then
@@ -424,15 +428,16 @@ For example, you can try 0.2 for 200ms allowed latency.
 
       PREFERRED_REGION="none"
       export PREFERRED_REGION
-# why are we messing with VPN_PROTOCOL #
+# we don't need to mess with VPN_PROTOCOL #
 #      VPN_PROTOCOL="no" #
 #      export VPN_PROTOCOL #
+                          # to limit kodi onscreen notification #
             VPN_PROTOCOL=no IVE_RUN=0 ./get_region.sh 2>/dev/null #
 
       if [[ -s /opt/etc/piavpn-manual/latencyList ]]; then #
         # Output the ordered list of servers that meet the latency specification $MAX_LATENCY
-            if  [[ -t 0 || -n "${SSH_TTY}" ]] #
-            then # running interactively
+                if  [[ -t 0 || -n "${SSH_TTY}" ]] #
+                then # RUNNING INTERACTIVELY #
         echo -e "Ordered list of servers with latency less than ${green}${MAX_LATENCY}${nc} seconds:" #
         i=0
         while read -r line; do
@@ -475,15 +480,15 @@ For example, you can try 0.2 for 200ms allowed latency.
         echo
         break
                 else echo "running non-interactively got ordered list choosing fastest" #
-                     # choose best region and proceed
-                       PREFERRED_REGION=$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList ) #
+                     # choose best region and proceed #
+                       PREFERRED_REGION=$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList ) # 
                        REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )" #
                        export PREFERRED_REGION #
                        _pia_notify 'Selected for '"${REGION}"'' #
                 fi #
-      else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
+      else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]] #
            if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
-           then # running non-interactively
+           then # RUNNING NON-INTERACTIVELY #
                 _pia_notify "No Available Servers Found!" "${BOTHER}"
            fi
         exit 1
@@ -496,8 +501,8 @@ For example, you can try 0.2 for 200ms allowed latency.
   else
     # Validate in-line declaration of PREFERRED_REGION; if invalid remove input to initiate prompts
     echo "Region input is : $PREFERRED_REGION"
-    export PREFERRED_REGION # added IVE_RUN to supress notify_kodi #
-                VPN_PROTOCOL=no IVE_RUN='1' ./get_region.sh 2>/dev/null #
+    export PREFERRED_REGION   # added to supress kodi notifications #
+                VPN_PROTOCOL=no IVE_RUN='1' ./get_region.sh 2>/dev/null # 
     if [[ $? != 1 ]]; then
       break
     fi
@@ -507,7 +512,7 @@ done
 
 if [[ -z $VPN_PROTOCOL ]]; then
               # these scipts are for wireguard only! #
-                VPN_PROTOCOL="wireguard" #
+                export VPN_PROTOCOL="wireguard" #
 fi
 # This section asks for user connection preferences
 case $VPN_PROTOCOL in
@@ -555,7 +560,7 @@ setDNS="yes"
 if ! command -v resolvconf &>/dev/null && [[ $VPN_PROTOCOL == "wireguard" ]]; then
    # Called from command line not systemd service #
      if [[ -t 0 || -n "${SSH_TTY}" ]] #
-     then #
+     then  # RUNNING INTERACTIVELY #
           echo -e "${red}The resolvconf package could not be found." #
           echo "This script can not set DNS for you" #
           echo -e "but connmanctl can.${nc}" #
