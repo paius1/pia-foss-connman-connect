@@ -52,7 +52,7 @@
   # [ -z "${PRE_UP_RUN+y}"  ] then chances we don't have a service?
   # this is redundant because run_setup.sh catches this!? (better safe that sorry) 
   # 
-    if [[ -z "${PRE_UP_RUN+y}" ]]
+    if [[ -z "${PRE_UP_RUN+y}" ]] && [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
   # Not called by systemd does service exist?, running?
     then logger "$(pwd)/${BASH_SOURCE##*/} was not started by systemd"
          if [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]]
