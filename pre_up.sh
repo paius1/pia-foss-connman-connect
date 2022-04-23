@@ -52,18 +52,18 @@
     fi
 
   # Stop any vpn's connections #
-    logger "Checking vpn state"
   # First service is connected service, is it a vpn?
     connection="$(connmanctl services | awk 'NR == 1 && /vpn_/ {print $NF}')"
     if [[ -n "${connection}" ]]
   # Vpn active
     then logger "$(connmanctl disconnect "${connection}")"
+    else logger "No current vpn connection"
     fi
 
   # Can I reach the interwebs
     if ! ping -c 1  -W 1  -q 208.67. 222.222 > /dev/null 2>&1
   # No
-    then logger "restoring firewall"
+    then logger "restoring ${MY_FIREWALL:-openrules.v4} firewall"
          iptables-restore < "${MY_FIREWALL:-openrules.v4}"
   # Yes
     else logger "Can reach interwebs"
