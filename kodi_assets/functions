@@ -1,41 +1,70 @@
 #! /opt/bin/bash
 # c plgroves gmail 2022
 # pia-foss-wireguard kodi functions
+
   # credentials for local kodi
     kodi_user=kodi
     kodi_pass=
     kodi_host=localhost
     kodi_port=8080
 
-  function _parse_JSON {
-      local key=$1
-      /usr/bin/awk -F"[,:}]" \
-                   '{for(i=1;i<=NF;i++)
-                    {if($i~/'"${key}"'\042/)
-                       {print $(i+1)}}}' \
-                 | tr -d '"'
- }
- export -f _parse_JSON
+  # logs to systemd journal, and/or screen and log file
+    function logger() {
+        local message log source tab spaces 
+        message="${1}"
+        log="${2:-$LOG}"
+      # in case $LOG is not set
+        log="${log:-/dev/null}"
+        source="${3:-$(caller)}"
+        tab=$((${#source}+1))
+        IFS="" spaces="$(printf "%$((tab*2))s")"
 
-  function _kodi_REQ {
-      /opt/bin/curl --silent -X POST --header "Content-Type: application/json" -d "$1" http://$kodi_user:$kodi_pass@$kodi_host:$kodi_port/jsonrpc
- }
- export -f _kodi_REQ
+        if [[ -z "${PRE_UP_RUN+y}" ]]
+      # not running a systemd service print to stdout and $log
+        then
+             printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
+           # cat to systemd journal
+             systemd-cat -t pia-wireguard -p warning <<< "${message}"
+        else echo "${message}"
+      # send message to systemd journal
+        fi
+    }
+  export -f logger
 
-# ALL that to get to this
-  function _pia_notify() {
-      local message displaytime image show_image
-            message="${1:-message is empty}"
-            displaytime="${2:-5000}"
-            image="${3:-"kodi_assets/pia_on_48x48.png"}"
-            [[ -s "$(pwd)/${image}" ]] \
-            && showimage=',"image":"'"$(pwd)/${image}"'"'
+  # match 'value' in kodi json
+    function _parse_JSON {
+        local key=$1
+        /usr/bin/awk -F"[,:}]" \
+                     '{for(i=1;i<=NF;i++)
+                      {if($i~/'"${key}"'\042/)
+                         {print $(i+1)}}}' \
+                   | tr -d '"'
+ }
+  export -f _parse_JSON
+
+  # send request to kodi json api
+    function _kodi_REQ {
+        /opt/bin/curl --silent -X POST --header "Content-Type: application/json" -d "$1" http://$kodi_user:$kodi_pass@$kodi_host:$kodi_port/jsonrpc
+ }
+  export -f _kodi_REQ
+
+  # ALL that to get to kodi gui notifications
+    function _pia_notify() {
+        local message displaytime image image_path show_image
+        message="${1:-empty message}"
+        displaytime="${2:-5000}"
+      # set default image file name
+        image="${3:-"pia_on_48x48.png"}"
+      # assume ./kodi_assets  n.b. all scripts set working directory
+        image_path="$(pwd)/kodi_assets"
+      [[ -s "${image_path}/${image}" ]] \
+      && show_image=',"image":"'"${image_path}/${image}"'"'
 
       status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${showimage}"' }, "id": 1} '))"
 
-      if  [[ "$status" =~ OK ]]
-      then return 0
-      else return 1
-      fi
+        [[ "$status" =~ \"OK\" ]] \
+        || return 1
+        return 0
  }
   export -f _pia_notify
+
