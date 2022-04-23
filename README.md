@@ -29,13 +29,13 @@ then
 # Running with systemd
 Included is a systemd unit file to automate a VPN connection
 
-to run as a service you need:
+to run as a service you need to:
 
-  Predefined variables for the pia-foss manual connections scripts
-  saved to:  /path/to/these/scripts/.env
-  Without these the scripts run interactively and the unit will fail.
+#### &emsp;Create a:
+&emsp;&ensp;/path/to/these/scripts/.env file  
+&emsp;&emsp;&ensp;The original pia-foss manual connections scripts run interactively, so you need defined variables  
  
-#### minimum .env file
+#### &emsp;minimum .env file
                PIA_USER=pXXXXXXX
                PIA_PASS=p45sw0rdxx
                AUTOCONNECT='false' # if set 'true' PREFERRED_REGION is ignored
@@ -44,7 +44,7 @@ to run as a service you need:
                PREFERRED_REGION='aus_perth'
                                 # run PIA_PF='true|false' /path/to/scripts/get_region.sh
                                 # for valid options
-#### optional: some are not part of pia-foss, and must be exported
+#### &emsp;optional: some are not part of pia-foss, and must be exported
                PIA_PF='true|false'
                PIA_DNS='true|false'
                #export CONNMAN_CONNECT='true' # overcomes AUTOCONNECT's limitation,
@@ -53,19 +53,22 @@ to run as a service you need:
                #export WG_FIREWALL=/path/to/wireguard/iptables-save.file
                
   
-  Edit:
+####  &emsp;Edit:
   
-1. pia-wireguard.service file &ensp;&ensp;&ensp;&ensp;&ensp;Replace /path/to/scripts with the actual path to scripts  
+&emsp;&emsp;pia-wireguard.service file &ensp;&ensp;&ensp;&ensp;&ensp;Replace /path/to/scripts with the actual path to scripts  
   
-3. pre_up.sh&emsp;&emsp;&emsp;&ensp;add any vpn dependent applications you need to start/stop,
-4. post_up.sh&nbsp;&emsp;&emsp;&emsp;e.g. transmission (anyone)
-5. shutdown.sh
+&emsp;&emsp;pre_up.sh&emsp;&emsp;&emsp;add any vpn dependent applications  
+&emsp;&emsp;post_up.sh&nbsp;&emsp;&emsp; you need to start/stop,  
+&emsp;&emsp;shutdown.sh&nbsp;&emsp;&ensp;e.g. transmission (anyone)  
 
 
 
 
 
-  Copy pia-wireguard.service to /storage/.config/system.d/  
+####   &emsp;Copy:
+&emsp;&emsp;pia-wireguard.service to /storage/.config/system.d/  
+####   &emsp;Run:
+
 ```
     systemctl daemon-reload
     systemctl enable pia-wireguard.service
@@ -77,7 +80,8 @@ to run as a service you need:
 #  To run from kodi Favourites:
    from pia-foss-connman-connect/kodi_assets/  
 &emsp;&emsp;copy the xml in add_to_favourites.xml to ~/.kodi/userdate/favourites.xml  
-&emsp;&emsp;change the paths to the scripts and thumbnails i.e. .png files
+&emsp;&emsp;change the paths to the scripts and thumbnails i.e. .png files  
+&emsp;&emsp;set kodi user, password, host, and port in kodi_assets/functions  
 
 &ensp;reload kodi,  
 ```
