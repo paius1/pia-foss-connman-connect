@@ -1,12 +1,12 @@
 #!/opt/bin/bash
 #    v 0.0.1, c plgroves gmail 2022
 #    SCRIPTNAME called by PATH/run_setup.sh
-#        before pia-wireguard service is up
+#               or ExecStartPre in service unit file
 #        
 #        sets a safe and sane environment
 #         e.g. disconnect vpn_XX_XX_XX_XX
 #              reset firewall
-#              set nameservers
+#              check DNS resolution
 #              stop vpn dependent applications e.g. port_forwarding, transmission
 ####
 # 
@@ -23,76 +23,66 @@
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin
 
-    function logger() {
-        local message="${1}"; local source="${2:-${BASH_SOURCE[0]}}"; local log="${3:-$LOG}"
-        local tab spaces 
-        tab="${TAB:-100}"
-        IFS="" spaces="$(printf "%$((tab*2))s")"
-        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
-        [[ -z "${PRE_UP_RUN+y}" ]] \
-        && systemd-cat -t pia-wireguard.favourites -p warning <<< "${message}"
-    }
+  # source functions
+    [ -z "${kodi_user}" ] \
+    && source ./kodi_assets/functions #
 
-    log="${LOG:=/dev/null}" # export or set LOG to monitor scripts added to pia-foss
+  # kodi System.Exec doesn't allow arguments so we need to setup logging
+  # systemd sets LOG=/dev/null if not set to /tmp/pia-wireguard.log
+    log="${LOG:-/tmp/pia-wireguard.log}"
+  # Sllows calling script with an alternate log as an argument
     LOG="${1:-${log}}"
-    bash_source="${#BASH_SOURCE[0]}"
-    export TAB=$((bash_source+1))
 
-  # on SYSTEM START wait for things to settle down
-  # and save a copy of /etc/resolv.conf, and the routing table
     if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]]
+  # System has just started wait, and save a copy of /etc/resolv.conf and the routing table
     then logger "System Startup waiting..."
-         sleep 3
+         sleep 3 
+       # Assume the nameservers at startup are good
          cp /etc/resolv.conf /storage/.cache/starting_resolv.conf
+         logger "copying /etc/resolv.conf /storage/.cache/starting_resolv.conf"
+       # Same for the routing table
+         logger "backing up routing table to /storage/.config/ip_route_clean.bin"
          ip route save table all > /storage/.config/ip_route_clean.bin
     fi
 
-    logger "Checking wireguard state"
-  # stop any VPN's previously started
-  # [ -z "${PRE_UP_RUN+y}"  ] then chances we don't have a service?
-  # this is redundant because run_setup.sh catches this!? (better safe that sorry) 
-  # 
-    if [[ -z "${PRE_UP_RUN+y}" ]]
-  # Not called by systemd does service exist?, running?
-    then logger "$(pwd)/${BASH_SOURCE##*/} was not started by systemd"
-         if [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]]
-       # there is a service
-         then if systemctl is-active --quiet pia-wireguard
-            # and it is running. Restart it.
-              then systemctl restart pia-wireguard &
-            # or not
-              else systemctl start pia-wireguard &
-              fi
-              exit 0
-       # wireguard is controlled by connmanctl
-         else iface="$(grep vpn_ < <( connmanctl services) | awk '{print $NF}')"
-              logger "Disconnecting ${iface}"
-              connmanctl disconnect "$${iface}"
-         fi
-  # Called by systemd
-    else logger "Called systemd service PRE_UP_RUN=${PRE_UP_RUN} "
+  # Recommend running as a systemd service
+    if [[ -z "${PRE_UP_RUN+y}" ]] #&& [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
+  # No systemd service
+    then logger "No systemd service exists"
+    fi
+
+  # Stop any vpn's connections #
+    logger "Checking vpn state"
+  # First service is connected service, is it a vpn?
+    connection="$(connmanctl services | awk 'NR == 1 && /vpn_/ {print $NF}')"
+    if [[ -n "${connection}" ]]
+  # Vpn active
+    then logger "$(connmanctl disconnect "${connection}")"
     fi
 
   # Can I reach the interwebs
     if ! ping -c 1  -W 1  -q 208.67. 222.222 > /dev/null 2>&1
   # No
     then logger "restoring firewall"
-         iptables-restore < ${MY_FIREWALL:-openrules.v4}
+         iptables-restore < "${MY_FIREWALL:-openrules.v4}"
+  # Yes
+    else logger "Can reach interwebs"
     fi
 
-  # can I resolve hostnames
+  # Can I resolve hostnames
     if ! dig +time=1 +tries=1 privateinternetaccess.com >/dev/null
-  # No
-    then logger "restoring DNS"
-         # this is a copy of /etc/resov.conf saved at system start by pre_up.sh
-           if [ -f /storage/.cache/starting_resolv.conf ]
-           then cat /storage/.cache/starting_resolv.conf > /etc/resolv.conf
-           else logger "no preexisting resolv.conf winging it"
-                # get nameservers from first active non vpn_ interface
-                  iface=$(connmanctl services | awk '/^\*/ && !/vpn_/{print $NF; exit}')
-                  mapfile  -d ' '  NS < <(awk -F'[=|;]' '/^Nameserver/{print $2}'  /storage/.cache/connman/"${iface}"/settings)
-                # or fall back to opendns
-                  nameserver="${NS[0]:-208.67. 222.222}"
+  # No, restore valid nameservers
+    then logger "restoring DNS nameservers"
+         if [ -f /storage/.cache/starting_resolv.conf ]
+       # There's a copy of /etc/resov.conf saved at system start by pre_up.sh
+         then cat /storage/.cache/starting_resolv.conf > /etc/resolv.conf
+         else logger "no preexisting resolv.conf winging it"
+       # or create a new resolv.conf from connmans settings
+            # Get nameservers from first active non vpn_ interface
+              iface=$(connmanctl services | awk '/^\*/ && !/vpn_/{print $NF; exit}')
+              mapfile -d ' ' NS < <(awk -F'[=|;]' '/^Nameserver/{printf "%s", $2}' ~/.cache/connman/"${iface}"/settings)
+            # or fall back to opendns
+              nameserver="${NS[0]:-208.67. 222.222}"
 
     cat <<- EOF > /etc/resolv.conf
     # Generated by PIA WIREGUARD
@@ -101,20 +91,24 @@ EOF
          fi
     fi
 
-  # timeout for systemd's sake
-    max_count=10
-  # Now wait for full connection
+  # Timeout for systemd's sake
+    max_count=15
     until ping -c 1 -W 1 -q privateinternetaccess.com > /dev/null
-    do sleep 2
+  # Wait for full connection
+    do   sleep 2
        # end at some point
          ((count++))
-         [ "${count}" -gt "${max_count}" ] \
-         && { echo "Interwebs failed"; exit 1; }
+         if [ "${count}" -gt "${max_count}" ]
+       # wait 30 seconds and exit
+         then logger "Interwebs failed after half a minute"
+              exit 1
+         fi
     done
+    logger "Have full network access"
 
-  # stop portforwarding 
     pf_pids=($(pidof port_forwarding.sh))
     if [ "${#pf_pids[@]}" -ne 0 ]
+  # Stop portforwarding 
     then logger "Stopping port forwarding"
          echo "${pf_pids[@]}" \
             | xargs kill -9 >/dev/null 2>&1
