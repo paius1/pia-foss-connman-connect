@@ -120,8 +120,8 @@ token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token') #
 tokenExpiration=$(timeout_timestamp)
 tokenLocation=/opt/etc/piavpn-manual/token
 
-   # Called from command line not systemd service #
      if [[ -t 0 || -n "${SSH_TTY}" ]] #
+   # Running interactively #
      then #
           echo -e "PIA_TOKEN=$token${nc}"
           echo #

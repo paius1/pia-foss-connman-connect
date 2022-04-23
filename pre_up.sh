@@ -52,7 +52,7 @@
   # [ -z "${PRE_UP_RUN+y}"  ] then chances we don't have a service?
   # this is redundant because run_setup.sh catches this!? (better safe that sorry) 
   # 
-    if [[ -z "${PRE_UP_RUN+y}" ]] && [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
+    if [[ -z "${PRE_UP_RUN+y}" ]]
   # Not called by systemd does service exist?, running?
     then logger "$(pwd)/${BASH_SOURCE##*/} was not started by systemd"
          if [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]]
@@ -109,7 +109,7 @@ EOF
        # end at some point
          ((count++))
          [ "${count}" -gt "${max_count}" ] \
-         && { logger "Interwebs failed"; exit 1; }
+         && { echo "Interwebs failed"; exit 1; }
     done
 
   # stop portforwarding 

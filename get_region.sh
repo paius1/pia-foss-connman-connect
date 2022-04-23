@@ -1,4 +1,4 @@
-#!/opt/bin/bash
+#!/opt/bin/bash -x
 # Copyright (C) 2020 Private Internet Access, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -36,12 +36,14 @@
   # and -t 0 false feedback for server search #
     if [[ "${IVE_RUN}" -eq 0 ]] || [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
     then # keep sending message while servers are being read quessed at 40 seconds #
-         if [[ ! -t 0 &&  ! -n "${SSH_TTY}" ]] # 
+         if [[ ! -t 0 &&  ! -n "${SSH_TTY}" ]] #
+           # running non-interactively
             then dots='•••••••••' #
                  for i in {1..8} #
                  do _pia_notify 'Testing for fastest Servers •'"${dots:0:${i}}"'' #
                  sleep 4.9 #
-            done& disown #
+            done&
+            disown #
          fi
     fi #
 
@@ -94,6 +96,8 @@ get_selected_region_data() {
          then # RUNNING INTERACTIVELY #
     echo -e "${red}The REGION_ID $selectedRegion is not valid.${nc}
     "
+                export MAX_LATENCY="${MAX_LATENCY:-0.05}" #
+                export AUTOCONNECT="false"
          else _pia_notify 'The REGION '"${selectedRegion}"' is not valid.' #
               sleep 5 #
               # keep going in non-interactive mode #

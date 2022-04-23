@@ -33,56 +33,50 @@
 # to run without interaction
 # PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd AUTOCONNECT=true PIA_DNS=true|false PIA_PF=true|false ./run_setup.sh 
 # the more variables you set the less interactive
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
 
-  # running from favourites and a systemd service file exits then use systemd
-  # 1) unit exists 2) not called by systemd, and 3) not running in a shell
-    if #
-    [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]] \
-    && \
-    [[ -z "${PRE_UP_RUN+y}" ]] \
-    && \
-    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
-  # systemd service exists, not called, and we are running non-interactively #
-    then #
-         systemd-cat -t pia-wireguard.favourites -p warning <<< "Starting service with systemd" #
-         if systemctl is-active  pia-wireguard.service #
-       # pia-wireguard is running. Restart.
-         then systemctl restart pia-wireguard.service & #
-       # start wireguard configuration using systemd
-         else systemctl start pia-wireguard.service & #
-         fi #
-         exit 0 #
-    fi #
-         
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
-  # replace any currently running run_setup.sh's #
+  # stop any rogue run_setup.sh's #
   # this can be a problem for non-interactive runs #
     pids=($(pidof run_setup.sh)) #
     mypid=$$ #
 
     if [ "${#pids[@]}" -gt 1 ] #
-  # remove $mypid instance from pids[@] #
-    then #
-         echo "run_setup.sh is already running, will stop other" #
+  # remove $mypid from {pids[@]} and stop the rest #
+    then echo "run_setup.sh is already running, will stop others" #
          for i in "${!pids[@]}" #
-         do if [ "${pids[$i]}" == "$mypid" ] #
-            then unset pids["${i}"] #
-            fi #
+         do   if [ "${pids[$i]}" == "$mypid" ] #
+            # Me #
+              then unset pids["${i}"] #
+              fi #
          done #
          echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
     fi #
 
-  # kodi notifications with timeouts and images #
-  # first argument is the message, second display time, third image file #
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
-    [ -z "${kodi_user}" ] \
-    && source ./kodi_assets/functions #
-  # kodi won't wait this long so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
-    BOTHER=14000 # display time in ms for important notifications #
+  # running from favourites and a systemd service file exits: use systemd #
+  # 1) unit exists 2) not called by systemd, and 3) not running in a shell #
+    if #
+    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] \
+    && \
+    [[ -z "${PRE_UP_RUN+y}" ]] \
+    && \
+    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+    then systemd-cat -t pia-wireguard.favourites -p warning <<< "(Re)starting pia-wireguard.service from outside of systemd" #
+  # systemd service exists, not called, and we are running non-interactively #
+         if systemctl --quiet is-active  pia-wireguard.service #
+       # pia-wireguard is running. (Re)start.
+         then systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service will be restarted" #
+              systemctl restart pia-wireguard.service & #
+         else systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service will be started" #
+       # pia-wireguard is not running. start.
+              systemctl start pia-wireguard.service & #
+         fi #
+         exit 0 #
+    fi #
 
   # systemd checks for non empty .env file, so should we #
   #     ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env & $PRE_UP_RUN #
@@ -92,10 +86,10 @@
     elif [[ -t 0 || -n "${SSH_TTY}" ]] #
        # notify to terminal #
          then echo "Get ready to rumble" # we can interact so no need for .env #
-         else _pia_notify "No valid PIA config -> $(pwd)/.env" "${BOTHER}" #
+         else _pia_notify "No valid PIA config -> $(pwd)/.env" 10000 #
        # Fail without minimal .env file #
-              sleep "$((BOTHER/1000))"
-              _pia_notify "CONNECTION FAILED" "${BOTHER}" # "$((BOTHER/2))" #
+              sleep 10
+              _pia_notify "CONNECTION FAILED" 100000 #
               exit 1 #
     fi #
 
@@ -132,69 +126,76 @@
   # running non-interactive kit check" #
     then #
 
-        function _is_empty() { [[ -z "${1}" ]]; } #
+         ## kodi notifications '_pia_notify' with timeouts and images #
+         # 1st argument is the message, 2nd display time, 3rd image file #
+           [ -z "${kodi_user}" ] \
+           && source ./kodi_assets/functions #
 
-        if #
-        _is_empty "${PIA_USER}" ||  
-        _is_empty "${PIA_PASS}" #
-      # NO CREDENTIALS, we can forget it #
-        then _pia_notify "Missing PIA Credentials" "${BOTHER}" #
-             sleep "$((BOTHER/1000+1))" #
-             _pia_notify "CONNECTION FAILED" #
-             exit 1 #
-        fi #
+         # kodi won't wait this long so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
+           BOTHER=10000 # display time in ms for important notifications #
 
-        # PREFERRED_REGION|AUTOCONNECT will create a connman config #
-        # AUTOCONNECT|CONNMAN_CONNECT != false|null requires using Settings > CoreELEC > Connections #
-        #   and sets no firewall or port forwarding #
-        #
-          if #
-          _is_empty "${PREFERRED_REGION}" ||  
-          _is_empty "${AUTOCONNECT}" ||  
-          _is_empty "${MAX_LATENCY}" #
-        # Set them #
-          then 
+         function _is_empty() { [[ -z "${1}" ]]; } #
 
-                 function _AUTOCONNECT_or_PREFERRED_REGION() { #
-                     if [[ "${AUTOCONNECT}" =~ ^t ]] #
-                     then echo "the fastest server"
-                          _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "8000" >/dev/null #
-                          sleep 8
-                     else echo "${PREFERRED_REGION}" #
-                     fi #
-                }
+       # Check credentials #
+         if #
+         _is_empty "${PIA_USER}" ||  
+         _is_empty "${PIA_PASS}" #
+       # NO CREDENTIALS, we can forget it #
+         then _pia_notify "Missing PIA Credentials" "${BOTHER}" #
+              sleep "$((BOTHER/1000+1))" #
+              _pia_notify "CONNECTION FAILED" 10000 #
+              exit 1 #
+         fi #
 
-             # Set AUTOCONNECT="${AUTOCONNECT:-false}" and go from there #
-               AUTOCONNECT="${AUTOCONNECT:-false}" # Keep AUTOCONNECT if set #
-               if ! _is_empty "${PREFERRED_REGION}" #
-             # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
-               then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
-             # PREFERRED_REGION not set #
-               else [[ "${AUTOCONNECT}" =~ ^f ]] \
-                    && MAX_LATENCY="${MAX_LATENCY:=0.05}" #
-                    via="the fastest server" #
-               fi #
-          fi #
+       # PREFERRED_REGION|AUTOCONNECT will create a connman config #
+       # AUTOCONNECT|CONNMAN_CONNECT != false|null requires using Settings > CoreELEC > Connections #
+       #   and sets no firewall or port forwarding #
+         if #
+         _is_empty "${PREFERRED_REGION}" ||  
+         _is_empty "${AUTOCONNECT}" ||  
+         _is_empty "${MAX_LATENCY}" #
+       # Set them #
+         then 
+              # AUTOCONNECT=true negates set PREFERRED_REGION
+                function _AUTOCONNECT_or_PREFERRED_REGION() { #
+                    if [[ "${AUTOCONNECT}" =~ ^t ]] #
+                    then echo "the fastest server"
+                         _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "8000" >/dev/null #
+                         sleep 8
+                    else echo "${PREFERRED_REGION}" #
+                    fi #
+               }
 
-        # BOTHER ABOUT REGION UNSET BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
-          _is_empty   "${PREFERRED_REGION}" \
-           && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
-                sleep "$((BOTHER/1000))"; } #
+              # Set AUTOCONNECT="${AUTOCONNECT:-false}" and go from there #
+                AUTOCONNECT="${AUTOCONNECT:-false}" # Keep AUTOCONNECT if set #
+                if ! _is_empty "${PREFERRED_REGION}" #
+              # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
+                then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
+              # PREFERRED_REGION not set #
+                else [[ "${AUTOCONNECT}" =~ ^f ]] \
+                     && MAX_LATENCY="${MAX_LATENCY:=0.05}" #
+                     via="the fastest server" #
+                fi #
+         fi #
 
-        # Set PIA_PF and PIA_DNS and notify of changes #
-          if _is_empty "${PIA_PF}" #
-          then PIA_PF='false' #
-#               _pia_notify "Port Forwarding disabled" #
-          fi #
-          if _is_empty "${PIA_DNS}" #
-          then PIA_DNS='true' #
-               _pia_notify "FORCED PIA DNS" #
-               sleep 4
-          fi #
+       # BOTHER ABOUT REGION UNSET BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
+         _is_empty   "${PREFERRED_REGION}" \
+          && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
+               sleep "$((BOTHER/1000))"; } #
+
+       # Set PIA_PF and PIA_DNS and notify of changes #
+         PIA_PF="${PIA_PF:-false}" #
+
+         if _is_empty "${PIA_DNS}" #
+         then PIA_DNS='true' #
+              _pia_notify "FORCED PIA DNS" #
+              sleep 4
+         fi #
+
+         _pia_notify 'getting details for '"${via}"'' #
     fi #
 
-  
-    if [ -z "${PRE_UP_RUN+y}" ] #
+    if [ -z "${PRE_UP_RUN+y}" ] # Should only get here if running interactively
   # PRE_UP_RUN is set in systemd.unit file, if not set, setup sane environment #
     then echo "Setting up sane environment" #
          # for debugging scripts added to pia-foss/manual-connections #
@@ -202,8 +203,6 @@
            echo > "${LOG}" #
          ./pre_up.sh #
     fi #
-
-    _pia_notify 'getting details for '"${via}"'' #
 
 # end of major changes
 ########################################################################
@@ -290,7 +289,8 @@ while :; do
 
   # Confirm credentials and generate token
   ./get_token.sh
-
+# DEBUGGING
+echo REGION CHECKED BEFORE THIS
           # changed tokenLocation #
             tokenLocation="/opt/etc/piavpn-manual/token" #
   # If the script failed to generate an authentication token, the script will exit early.

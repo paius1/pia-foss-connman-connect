@@ -311,7 +311,7 @@ sleep 2 #
          echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" | tee /tmp/port_forward.log #
 
     PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME \
-    ./port_forwarding.sh >> /tmp/port_forward.log & #
+    ./port_forwarding.sh >> /tmp/port_forward.log & disown #
 
 #############################################
  exit 0                                     #

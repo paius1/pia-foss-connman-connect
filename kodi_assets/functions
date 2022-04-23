@@ -31,7 +31,7 @@
             [[ -s "$(pwd)/${image}" ]] \
             && showimage=',"image":"'"$(pwd)/${image}"'"'
 
-      status="$(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${showimage}"' }, "id": 1} ')"
+      status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${showimage}"' }, "id": 1} '))"
 
       if  [[ "$status" =~ OK ]]
       then return 0
