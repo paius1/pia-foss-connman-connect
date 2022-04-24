@@ -33,7 +33,7 @@ to run as a service you need to:
 
 #### &emsp;Create a:
 &emsp;&ensp;/path/to/these/scripts/.env file  
-&emsp;&emsp;&ensp;The original pia-foss manual connections scripts run interactively, so you need defined variables  
+&emsp;&emsp;&ensp;The original pia-foss manual scripts run interactively, so you need to pre-define variables  
  
 #### &emsp;minimum .env file
                PIA_USER=pXXXXXXX
