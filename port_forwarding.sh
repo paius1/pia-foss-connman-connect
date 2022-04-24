@@ -35,6 +35,14 @@
   # where to store the port number for later usage #
     portfile='/tmp/port.dat' #
 
+    [[ -z "${kodi_user}" ]] \
+       && source ./kodi_assets/functions #
+
+  # this can be run separately
+    [[ -t 0 || -n "${SSH_TTY}" ]] \
+       && export PRE_UP_RUN='cli' #
+    export LOG="${LOG:=/tmp/pia-wireguard.log}" #
+
 # This function allows you to check if the required tools have been installed.
 check_tool() {
   cmd=$1
@@ -79,25 +87,13 @@ if [[ -t 1 ]]; then
   fi
 fi
 
-    function logger() {
-        local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}"
-        local tab spaces 
-        tab="${TAB:-100}"
-        IFS="" spaces="$(printf "%$((tab*2))s")"
-        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
-}
-
-    log="${LOG:=/dev/null}" # export LOG to environment to monitor these scripts #
-    LOG="${1:-${log}}" #
-    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
-
   # An error with no recovery logic occured #
     fatal_error () { #
         local port="${1}" #
-        logger "Fatal error" #
-        # remove port from iptables
-          iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
-        logger -n "Attempting Restarting port forwarding" #
+        _logger "Fatal error" #
+      # remove port from iptables
+        iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
+        _logger -n "Attempting Restarting port forwarding" #
         sleep 15
     
         PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$PF_GATEWAY PF_HOSTNAME=$PF_HOSTNAME \
@@ -107,10 +103,10 @@ fi
 
   # Handle shutdown behavior
     finish () { #
-      logger "Port forward rebinding stopped. The port will likely close soon." #
-        # remove port from iptables
-          iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
-      exit 0 #
+        _logger "Port forward rebinding stopped. The port will likely close soon." #
+      # remove port from iptables #
+        iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
+        exit 0 #
  }
     trap finish SIGTERM SIGINT SIGQUIT #
 
@@ -119,8 +115,9 @@ fi
     mypid=$$ #
 
     if [ "${#pids[@]}" -gt 1 ] #
-    then # remove this instance from pids[@] #
-         logger "port_forwarding.sh is already running, will stop other" #
+  # remove this instance from pids[@] #
+    then #
+         _logger "port_forwarding.sh is already running, will stop other" #
          for i in "${!pids[@]}" #
          do if [ "${pids[$i]}" == "$mypid" ] #
             then unset pids[$i] #
@@ -131,11 +128,11 @@ fi
 
   # wait for privateinternetaccess this could be an infinite loop #
     until ping -c 1 -W 1  privateinternetaccess.com > /dev/null 2>&1 #
-    do logger "wait for privateinternetaccess" #
+    do _logger "wait for privateinternetaccess" #
        sleep 5 #
-       connmanctl connect "${SERVICE}" || exit 0
-       # or create a time out
-       # or just exit
+       connmanctl connect "${SERVICE}" || exit 0 #
+       # maybe create a time out #
+       # or just exit #
     done #
 
     >&2 echo -ne "\nStarting port forwarding in " #
@@ -210,10 +207,10 @@ expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
     then #
           # Dump port to file if requested #
           [ -n "$portfile" ] && { echo "${port}" > "$portfile" && \
-                                  logger "Port dumped to $portfile"; } #
+                                  _logger "Port dumped to $portfile"; } #
 
         # add port to iptables #
-          logger "adding peer port ${port} to firewall" #
+          _logger "adding peer port ${port} to firewall" #
           iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT #
 
 >&2 echo -ne "
@@ -248,12 +245,12 @@ while true; do
 
     if [ -z "${pf_firstrun+y}" ] #
     then ((pf_firstrun++))
-         logger "Forwarded port    $port" #
-         logger "Refreshed at      $(date)"
-         logger "Expires at        $(date --date="$expires_at")" #
-         logger "${BASH_SOURCE##*/} must remain active to use port forwarding," #
-         logger "and will refresh every 15 minutes." #
-    else logger "Rebinding to peer port ${port}" #
+         _logger "Forwarded port    $port" #
+         _logger "Refreshed at      $(date)"
+         _logger "Expires at        $(date --date="$expires_at")" #
+         _logger "${BASH_SOURCE##*/} must remain active to use port forwarding," #
+         _logger "and will refresh every 15 minutes." #
+    else _logger "Rebinding to peer port ${port}" #
     fi #
 
     # sleep 15 minutes

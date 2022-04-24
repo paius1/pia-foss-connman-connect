@@ -33,29 +33,17 @@
 # to run without interaction
 # PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd AUTOCONNECT=true PIA_DNS=true|false PIA_PF=true|false ./run_setup.sh 
 # the more variables you set the less interactive
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
 
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
-  # stop any rogue run_setup.sh's #
-  # this can be a problem for non-interactive runs #
-    pids=($(pidof run_setup.sh)) #
-    mypid=$$ #
-
-    if [ "${#pids[@]}" -gt 1 ] #
-  # remove $mypid from {pids[@]} and stop the rest #
-    then echo "run_setup.sh is already running, will stop others" #
-         for i in "${!pids[@]}" #
-         do   if [ "${pids[$i]}" == "$mypid" ] #
-            # Me #
-              then unset pids["${i}"] #
-              fi #
-         done #
-         echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
-    fi #
+  # add kodi GUI.Notifications with timeouts and images #
+  #     _pia_notify 'message' 'display time' 'image file' #
+  # and logging function _logger 'message' [ logfile ] #
+    [ -z "${kodi_user}" ] \
+    && source ./kodi_assets/functions #
 
   # running from favourites and a systemd service file exits: use systemd #
   # 1) unit exists 2) not called by systemd, and 3) not running in a shell #
@@ -65,32 +53,54 @@
     [[ -z "${PRE_UP_RUN+y}" ]] \
     && \
     [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
-    then systemd-cat -t pia-wireguard.favourites -p warning <<< "(Re)starting pia-wireguard.service from outside of systemd" #
   # systemd service exists, not called, and we are running non-interactively #
+    then systemd-cat -t pia-wireguard.favourites -p warning <<< "(Re)starting pia-wireguard.service from outside of systemd" #
+       # log this in pia-wireguard log #
+         LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' #
+       # optional Gui notificaton #
+         _pia_notify 'Called outside of systemd service is '" $(systemctl is-active  pia-wireguard.service)"'' ; sleep 5 #
          if systemctl --quiet is-active  pia-wireguard.service #
-       # pia-wireguard is running. (Re)start.
-         then systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service will be restarted" #
+       # pia-wireguard is running. (Re)start. #
+         then systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service is restarting" #
+
               systemctl restart pia-wireguard.service & #
-         else systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service will be started" #
-       # pia-wireguard is not running. start.
+
+         else systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service is starting" #
+       # pia-wireguard is not running. start. #
+
               systemctl start pia-wireguard.service & #
+
          fi #
          exit 0 #
+    elif  #
+    [[ -t 0 || -n "${SSH_TTY}" ]] && \
+    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
+  # Have a service file and running interactively #
+    then SERVICE_STATE="$(systemctl is-active  pia-wireguard.service)" #
+         if [[ "${SERVICE_STATE}" =~ ^a ]] #
+       # Service is running #
+         then read -r -p "PIA Wireguard is running, continue? ([N]o/[y]es): " continue #
+              grep -ivq y <<< "${continue:0:1}" \
+                          && { echo "Goodbye"; exit 1; } #
+#         else
+       # Send a message to systemd journal regarding this #
+         systemd-cat -t pia-wireguard.cmdline -p warning <<< "Stopping pia-wireguard.service from the command line" #
+       # Stop pia-wireguard service
+         systemctl stop pia-wireguard.service #
+         fi #
+else _pia_notify 'Called by systemd   '" $(systemctl is-active  pia-wireguard.service)"'' #; sleep 5
     fi #
 
-  # systemd checks for non empty .env file, so should we #
+  # systemd would check for non empty .env file, so should we #
   #     ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env & $PRE_UP_RUN #
     if [[ -s .env ]] #
   # read variables for .env file #
     then source .env  #
-    elif [[ -t 0 || -n "${SSH_TTY}" ]] #
-       # notify to terminal #
-         then echo "Get ready to rumble" # we can interact so no need for .env #
-         else _pia_notify "No valid PIA config -> $(pwd)/.env" 10000 #
-       # Fail without minimal .env file #
-              sleep 10
-              _pia_notify "CONNECTION FAILED" 100000 #
-              exit 1 #
+    else _pia_notify "No valid PIA config -> $(pwd)/.env" 10000 #
+  # Fail without minimal .env file #
+         sleep 10
+         _pia_notify "CONNECTION FAILED" 100000 #
+         exit 1 #
     fi #
 
   # possible variables for .env #
@@ -126,13 +136,9 @@
   # running non-interactive kit check" #
     then #
 
-         ## kodi notifications '_pia_notify' with timeouts and images #
-         # 1st argument is the message, 2nd display time, 3rd image file #
-           [ -z "${kodi_user}" ] \
-           && source ./kodi_assets/functions #
-
-         # kodi won't wait this long so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
-           BOTHER=10000 # display time in ms for important notifications #
+       # display time in ms for important notifications #
+       # kodi won't wait so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
+         BOTHER=14000 #
 
          function _is_empty() { [[ -z "${1}" ]]; } #
 
@@ -143,7 +149,7 @@
        # NO CREDENTIALS, we can forget it #
          then _pia_notify "Missing PIA Credentials" "${BOTHER}" #
               sleep "$((BOTHER/1000+1))" #
-              _pia_notify "CONNECTION FAILED" 10000 #
+              _pia_notify "CONNECTION FAILED" "$((BOTHER-5000))"#
               exit 1 #
          fi #
 
@@ -189,18 +195,22 @@
          if _is_empty "${PIA_DNS}" #
          then PIA_DNS='true' #
               _pia_notify "FORCED PIA DNS" #
-              sleep 4
+              sleep 2
          fi #
 
          _pia_notify 'getting details for '"${via}"'' #
     fi #
-
-    if [ -z "${PRE_UP_RUN+y}" ] # Should only get here if running interactively
-  # PRE_UP_RUN is set in systemd.unit file, if not set, setup sane environment #
-    then echo "Setting up sane environment" #
-         # for debugging scripts added to pia-foss/manual-connections #
-           export LOG=/tmp/pia-wireguard.log #
-           echo > "${LOG}" #
+#############################################################################################
+  # PRE_UP_RUN is set true by systemd. #
+    if [ -z "${PRE_UP_RUN+y}" ] #
+  # No systemd service or running interactively #
+    then # if running interactively set PRE_UP_RUN to shorten log messages #
+         [[ -t 0 || -n "${SSH_TTY}" ]] \
+            && export PRE_UP_RUN='cli' #
+       # in case we don't have a systemd service enabled #
+         export LOG=/tmp/pia-wireguard.log #
+         : > "${LOG}" #
+         _logger "Setting up sane environment" #
          ./pre_up.sh #
     fi #
 
@@ -522,6 +532,7 @@ For example, you can try 0.2 for 200ms allowed latency.
          # RUNNING NON-INTERACTIVELY #
            then #
                 _pia_notify "No Available Servers Found!" "${BOTHER}" #
+                _logger "No Available Servers Found!" #
            fi #
         exit 1
       fi

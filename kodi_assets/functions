@@ -62,7 +62,7 @@
 
       status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${showimage}"' }, "id": 1} '))"
 
-        [[ "$status" =~ \"OK\" ]] \
+        [[ "$status" =~ OK ]] \
         || return 1
         return 0
  }

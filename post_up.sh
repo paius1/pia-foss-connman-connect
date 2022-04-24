@@ -20,20 +20,14 @@
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
-    function logger() {
-        local message="${1}"; local source="${2:-${BASH_SOURCE}}"; local log="${3:-$LOG}"
-        local tab spaces 
-        tab="${TAB:-100}"
-        IFS="" spaces="$(printf "%$((tab*2))s")"
-        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
-}
+# DEBUGGING #
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
+    [ -z "${kodi_user}" ] \
+    && source ./kodi_assets/functions #
 
-    log="${LOG:=/dev/null}"
-    LOG="${1:-${log}}" # export LOG to environment to monitor these scripts
-    bash_source="${#BASH_SOURCE}"; export TAB=$((bash_source+1))
+    if [[ "${PRE_UP_RUN}y" != 'true' ]] #
+    then >&2 _logger "Finishing up ..."; fi
 
-  # PIA's scripts are set to a relative path
-    cd "${0%/*}" || exit 255
-    logger "Place any desired commands  after this line"
+  # Add any applications to start after this
 
 exit 0

@@ -110,7 +110,8 @@ wireguard_json="$(curl -s -G \
   --cacert "ca.rsa.4096.crt" \
   --data-urlencode "pt=${PIA_TOKEN}" \
   --data-urlencode "pubkey=$pubKey" \
-  "https://${WG_HOSTNAME}:1337/addKey" )"
+  "https://${WG_HOSTNAME}:1337/addKey" | tee /tmp/wireguard_json )" #
+  # added tee to save wireguard_json output
 export wireguard_json
 
 # Check if the API returned OK and stop this script if it didn't.
@@ -119,6 +120,7 @@ if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   exit 1
 fi
 
+    REGION_NAME="$(/opt/bin/jq -r '.name' /tmp/regionData )" #
 
   # CONNMAN sets up the interface ignoring wg-quick #
 # Create the WireGuard config based on the JSON received from the API
@@ -171,7 +173,7 @@ echo -e "${green}OK!${nc}"
     cat <<-EOF > /storage/.config/wireguard/pia.config
     [provider_wireguard]
     Type = WireGuard
-    Name = WireGuard VPN Tunnel
+    Name = PIA [${REGION_NAME}] wireguard tunnel
     Host = ${Endpoint%:*}
     WireGuard.Address = ${Address}/24
     WireGuard.ListenPort = ${Endpoint#*:}
@@ -184,18 +186,17 @@ echo -e "${green}OK!${nc}"
 	EOF
     #
 
-    [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
-    REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )" #
-
   # I placed this here for interactive use of these scripts #
   # CONNMAN_CONNECT is set true by systemd; AUTOCONNECT from environment #
   # AUTOCONNECT default false if run non-interactively #
     if [[ "${CONNMAN_CONNECT}" = "true" ]] || [[ "${AUTOCONNECT}" = "true" ]] #
-    then echo "CONNMAN service ${SERVICE}! is ready" #
+    then _logger "CONNMAN service ${SERVICE}! is ready" #
+#_pia_notify 'Connman config for '"${REGION_NAME}"' created'
          sleep 1 #
       
     else # Connection Dialog/Monologue #
-         if [[ -t 0 || -n "${SSH_TTY}" ]] # skip Y/n dialog if running non-interactively #
+         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+       # running interactively
          then echo -e "\nCONNMAN service ${SERVICE}! is ready" #
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
@@ -207,7 +208,7 @@ echo -e "${green}OK!${nc}"
                    echo -e "\t    WILL NOT set iptables killswitch!?" #
                    echo -e "\tiptables-restore $(pwd)/rules-wireguard.v4     WILL!" #
                    echo #
-                        echo  -e "\tTo enable port forwarding run\n" 
+                        echo  -e "\tTo (re)enable port forwarding run\n" 
                         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" #
                    if [[ "${PIA_PF}" != 'true' ]] #
                    then #
@@ -220,12 +221,25 @@ echo -e "${green}OK!${nc}"
                         echo #
                    exit 0 #
               fi #
-         else # RUNNING NON-INTERACTIVELY #
-                _pia_notify 'Saved configuration for '"${REGION}"' '; sleep 4 #
-                _pia_notify "Goto Settings>Coreelec>Connections" 10000; sleep 10 #
-                _pia_notify "This precludes port forwarding and setting a safe firewall" ; sleep 5 #
-                _pia_notify "This precludes port forwarding and setting a safe firewall" ; sleep 5 #
-                _pia_notify "Set CONNMAN_CONNECT=true to avoid this" 10000 #
+         else #
+       # RUNNING NON-INTERACTIVELY #
+            # two lines that require scrolling really mess up estuary etc. #
+            # and some skins don't scroll and limit the number of lines #
+              if [[ "${PRE_UP_RUN}y" != 'true' ]] #
+            # without a systemd service installed #
+              then #
+                   _logger 'Saved configuration for '"${REGION_NAME}"' '#
+                   _logger "Goto Settings>Coreelec>Connections" #
+                   _logger "This precludes port forwarding and setting a safe firewall" #
+                   _logger "This precludes port forwarding and setting a safe firewall" #
+                   _logger "Set CONNMAN_CONNECT=true to avoid this" #
+              fi #
+              _pia_notify 'Saved configuration for '"${REGION_NAME}"' '; sleep 4 #
+              _pia_notify "Goto Settings>Coreelec>Connections" 10000; sleep 10 #
+              _pia_notify "This precludes port forwarding and setting a safe firewall" ; sleep 5 #
+              _pia_notify "This precludes port forwarding and setting a safe firewall" ; sleep 5 #
+              _pia_notify "Set CONNMAN_CONNECT=true to avoid this" 10000 #
+              #for i in {1..3}; do _pia_notify "Goto Settings > Coreelec > Connections"; sleep 4; done #
               exit 0 #
          fi #
     fi #
@@ -244,18 +258,21 @@ echo -e "${green}OK!${nc}"
         $(pwd)/shutdown.sh
 " #
          else #
-              _pia_notify 'Successfully connected to '"${REGION}"' ' #
+              _logger 'Successfully connected to '"${REGION_NAME}"' '
+              _pia_notify 'Successfully connected to '"${REGION_NAME}"' ' #
+              # sleep 2 # for notification #
          fi #
 
-sleep 2 #
+sleep 2 # for grins and giggles #
 #####################################################################
 # Remember to check /storage/.config/autostart.sh for any conflicts #
 #####################################################################
     echo "Setting up firewall" #
-       # SYSTEM START #
          if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
+       # SYSTEM START #
          then echo taking 3 #
               if ! lsmod | grep -q '^ip_tables' #
+            # ip_tables module not loaded yet Don't know when it normally is
               then echo ip_tables module not loaded #
                    modprobe ip_tables #
                    sleep 1 #
@@ -270,13 +287,15 @@ sleep 2 #
     else echo "CONNMAN service ${SERVICE} failed!" #
          [[ ! -t 0 && ! -n "${SSH_TTY}" ]] && \
            _pia_notify "    FAILED            " #
+           _logger "    FAILED            " #
          exit 255 #
     fi #
 
-  # Check and reset nameservers set by connmanctl #
     if [[ $PIA_DNS == "true" ]] #
-    then # connman subordinates vpn dns to any preset nameservers #
+  # Check and reset nameservers set by connmanctl #
+    then #
          if [ "$(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf)" != "${DNS}" ] #
+       # connman subordinates vpn dns to any preset nameservers #
          then echo "Replacing Connman's DNS with PIA DNS" #
               sed -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
                      /etc/resolv.conf > /tmp/resolv.conf #
@@ -286,8 +305,8 @@ sleep 2 #
     fi #
 
   # if called outside of systemd, then run ./post_up.sh
-    if [ -z "${PRE_UP_RUN+y}" ] #
-    then echo -e "Not called by system" #
+    if [[ "${PRE_UP_RUN}y" != 'true' ]] #
+    then echo -e "Not called by systemd" #
          echo -e "calling $(pwd)/post_up.sh\n" #
          ./post_up.sh > /dev/null & #
     fi #

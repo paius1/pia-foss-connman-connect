@@ -35,20 +35,20 @@
 
     if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]]
   # System has just started wait, and save a copy of /etc/resolv.conf and the routing table
-    then logger "System Startup waiting..."
-         sleep 3 
+    then _logger "System Startup waiting..."
+         sleep 1
        # Assume the nameservers at startup are good
          cp /etc/resolv.conf /storage/.cache/starting_resolv.conf
-         logger "copying /etc/resolv.conf /storage/.cache/starting_resolv.conf"
+         _logger "copying /etc/resolv.conf /storage/.cache/starting_resolv.conf"
        # Same for the routing table
-         logger "backing up routing table to /storage/.config/ip_route_clean.bin"
+         _logger "backing up routing table to /storage/.config/ip_route_clean.bin"
          ip route save table all > /storage/.config/ip_route_clean.bin
     fi
 
   # Recommend running as a systemd service
     if [[ -z "${PRE_UP_RUN+y}" ]] #&& [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
   # No systemd service
-    then logger "No systemd service exists"
+    then _logger "No systemd service exists"
     fi
 
   # Stop any vpn's connections #
@@ -56,27 +56,27 @@
     connection="$(connmanctl services | awk 'NR == 1 && /vpn_/ {print $NF}')"
     if [[ -n "${connection}" ]]
   # Vpn active
-    then logger "$(connmanctl disconnect "${connection}")"
-    else logger "No current vpn connection"
+    then _logger "$(connmanctl disconnect "${connection}")"
+    else _logger "No current vpn connection"
     fi
 
   # Can I reach the interwebs
     if ! ping -c 1  -W 1  -q 208.67. 222.222 > /dev/null 2>&1
   # No
-    then logger "restoring ${MY_FIREWALL:-openrules.v4} firewall"
+    then _logger "restoring ${MY_FIREWALL:-openrules.v4} firewall"
          iptables-restore < "${MY_FIREWALL:-openrules.v4}"
   # Yes
-    else logger "Can reach interwebs"
+    else _logger "Can reach interwebs"
     fi
 
-  # Can I resolve hostnames
+  # Check if we can dig it
     if ! dig +time=1 +tries=1 privateinternetaccess.com >/dev/null
   # No, restore valid nameservers
-    then logger "restoring DNS nameservers"
+    then _logger "restoring DNS nameservers"
          if [ -f /storage/.cache/starting_resolv.conf ]
        # There's a copy of /etc/resov.conf saved at system start by pre_up.sh
          then cat /storage/.cache/starting_resolv.conf > /etc/resolv.conf
-         else logger "no preexisting resolv.conf winging it"
+         else _logger "no preexisting resolv.conf winging it"
        # or create a new resolv.conf from connmans settings
             # Get nameservers from first active non vpn_ interface
               iface=$(connmanctl services | awk '/^\*/ && !/vpn_/{print $NF; exit}')
@@ -100,16 +100,16 @@ EOF
          ((count++))
          if [ "${count}" -gt "${max_count}" ]
        # wait 30 seconds and exit
-         then logger "Interwebs failed after half a minute"
+         then _logger "Interwebs failed after half a minute"
               exit 1
          fi
     done
-    logger "Have full network access"
+    _logger "Have full network access"
 
     pf_pids=($(pidof port_forwarding.sh))
     if [ "${#pf_pids[@]}" -ne 0 ]
   # Stop portforwarding 
-    then logger "Stopping port forwarding"
+    then _logger "Stopping port forwarding"
          echo "${pf_pids[@]}" \
             | xargs kill -9 >/dev/null 2>&1
     fi

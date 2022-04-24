@@ -1,4 +1,4 @@
-#!/opt/bin/bash -x
+#!/opt/bin/bash
 # Copyright (C) 2020 Private Internet Access, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -29,22 +29,25 @@
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
-  # OSNotifications for errors #
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
-    [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
-  # Only want to run when PREFERED_REGION unset or AUTOCONNECT=true #
-  # and -t 0 false feedback for server search #
+  # Gui Notifications #
+    [[ -z "${kodi_user}" ]] \
+       && source ./kodi_assets/functions #
+
+  # Progress... run while waiting for server list #
     if [[ "${IVE_RUN}" -eq 0 ]] || [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
-    then # keep sending message while servers are being read quessed at 40 seconds #
+  # keep sending notification while servers are being read quessed at 40 seconds #   
+    then dots='••••••••••••••••••••••••••••••••••••••••••••••••••' # multibyte
          if [[ ! -t 0 &&  ! -n "${SSH_TTY}" ]] #
-           # running non-interactively
-            then dots='•••••••••' #
-                 for i in {1..8} #
-                 do _pia_notify 'Testing for fastest Servers •'"${dots:0:${i}}"'' #
+       # running non-interactively #
+         then #
+              for i in {1..7} #
+              do _pia_notify 'Testing for fastest Servers '"${dots:0:$((i*3))}"'' #
                  sleep 4.9 #
-            done&
-            disown #
-         fi
+              done&
+              disown #
+         else for i in {1..33}; do echo -ne "\rTesting for fastest Servers ${dots:0:$((i*3))}"; sleep 1; done& disown
+       # running interactively #
+         fi #
     fi #
 
 # This function allows you to check if the required tools have been installed.
@@ -69,8 +72,8 @@ check_all_region_data() {
     echo -n "Getting the server list..."
 
   if [[ ${#all_region_data} -lt 1000 ]]; then
-       # Called from command line not systemd service #
          if [[ -t 0 || -n "${SSH_TTY}" ]] #
+       # Running interactively #
          then #
     echo -e "${red}Could not get correct region data. To debug this, run:"
     echo "$ curl -v $serverlist_url"
@@ -93,15 +96,13 @@ get_selected_region_data() {
   '.regions[] | select(.id==$REGION_ID)')"
   if [[ -z $regionData ]]; then
          if [[ -t 0 || -n "${SSH_TTY}" ]] #
-         then # RUNNING INTERACTIVELY #
+       # RUNNING INTERACTIVELY #
+         then # 
     echo -e "${red}The REGION_ID $selectedRegion is not valid.${nc}
     "
-                export MAX_LATENCY="${MAX_LATENCY:-0.05}" #
-                export AUTOCONNECT="false"
          else _pia_notify 'The REGION '"${selectedRegion}"' is not valid.' #
               sleep 5 #
-              # keep going in non-interactive mode #
-                export MAX_LATENCY="${MAX_LATENCY:-0.05}" #
+              # keeps going in non-interactive mode #
          fi #
     exit 1
   fi
@@ -219,9 +220,9 @@ if [[ $selectedRegion == "none" ]]; then
     .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   fi
       # Running thru server list takes a long time in a post-modem world
-        if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
-        then echo "running non-interactively" #
-        else #
+        if [[ -t 0 || -n "${SSH_TTY}" ]] #
+      # Running interactively #
+        then #
   echo -e Testing regions that respond \
     faster than "${green}$MAX_LATENCY${nc}" seconds:
         fi #
@@ -233,7 +234,8 @@ if [[ $selectedRegion == "none" ]]; then
   if [[ -z $selectedRegion ]]; then
 # MAX_LATENCY is too low #
         if [[ -t 0 || -n "${SSH_TTY}" ]] #
-        then echo "running non-interactive No region responded" #
+      # Running interactively #
+        then 
     echo -e "${red}No region responded within ${MAX_LATENCY}s, consider using a higher timeout."
     echo "For example, to wait 1 second for each region, inject MAX_LATENCY=1 like this:"
     echo -e "$ MAX_LATENCY=1 ./get_region.sh${nc}"
@@ -243,8 +245,8 @@ if [[ $selectedRegion == "none" ]]; then
     exit 1
   else
     echo -e "A list of servers and connection details, ordered by latency can be
-found in at : ${green}/opt/etc/piavpn-manual/latencyList${nc} #
-"
+found in : ${green}/opt/etc/piavpn-manual/latencyList${nc}
+" #
   fi
 else # PREFERRED_REGION selectedRegion != none #
   selectedOrLowestLatency="selected"
@@ -265,9 +267,9 @@ bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
-   # Called from command line not systemd service #
-     if [[ -t 0 || -n "${SSH_TTY}" ]] #
-     then #
+         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+       # running interactively #
+         then #
   echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}" #
   if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then #
     echo " (geolocated region)."
@@ -282,7 +284,7 @@ and port forwarding = ${PIA_PF}:
 ${green}WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
    PREFERRED_REGION='${bestServer_region}'
 " #
-     fi #
+          fi #
 fi
 
 # The script will check for an authentication token, and use it if present
@@ -306,11 +308,12 @@ fi
 
 # Connect with WireGuard and clear authentication token file and latencyList
 if [[ $VPN_PROTOCOL == "wireguard" ]]; then
-   # Called from command line not systemd service #
      if [[ -t 0 || -n "${SSH_TTY}" ]] #
+   # running interactively #
      then #
   echo "The ./get_region.sh script got started with"
   echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
+        echo -e "\tPREFERRED_REGION=\"$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList )\"" #
   echo "by running this command:"
   echo -e "$ ${green}\tPIA_TOKEN=$PIA_TOKEN \\" # added tabs
   echo "\tWG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\" #
