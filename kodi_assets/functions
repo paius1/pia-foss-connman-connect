@@ -2,16 +2,46 @@
 # c plgroves gmail 2022
 # pia-foss-wireguard kodi functions
 
+  # add kodi GUI.Notifications with timeouts and images
+  #     _pia_notify 'message' 'display time' 'image file'
+  # logging function
+  #     _logger 'message' [ logfile ]
+  # check for .env changes
+  # check for empty variables reguired to connect
+
   # credentials for local kodi
     kodi_user=kodi
     kodi_pass=
     kodi_host=localhost
     kodi_port=8080
 
+  # epoch time of file creation
+    function _created() {
+        /opt/bin/stat -c %Y "${1}" 2>/dev/null \
+                 || \
+                 echo $?
+        return 0
+ }
+    export -f _created
+
+  # returns difference between now and then
+    function _interval() {
+        local now then
+        then="${1:-1}"
+    
+        now="$(printf '%(%s)T' \
+                    | tee "${2:-/dev/null}")"
+        echo -n "$((now-${then}))"
+    return 0
+ }
+    export -f _interval
+
   # logs to systemd journal, and/or screen and log file
-    function logger() {
-        local message log source tab spaces 
-        message="${1}"
+    function _logger() {
+      local message log source tab spaces 
+      # this bashism allows adding echo blahblahblah `| tee >( tr '[:space:]' ' ' | _logger)`
+        message="${1-$(</dev/stdin)}"
+      # but blocks on empty stdin
         log="${2:-$LOG}"
       # in case $LOG is not set
         log="${log:-/dev/null}"
@@ -20,16 +50,16 @@
         IFS="" spaces="$(printf "%$((tab*2))s")"
 
         if [[ -z "${PRE_UP_RUN+y}" ]]
-      # not running a systemd service print to stdout and $log
+      # Running non-interactively but not from systemd: print to stdout and $log
         then
              printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
            # cat to systemd journal
-             systemd-cat -t pia-wireguard -p warning <<< "${message}"
+           #  systemd-cat -t pia-wireguard -p warning <<< "${message}"
         else echo "${message}"
-      # send message to systemd journal
+      # send message to stdout
         fi
     }
-  export -f logger
+  export -f _logger
 
   # match 'value' in kodi json
     function _parse_JSON {
@@ -48,10 +78,13 @@
  }
   export -f _kodi_REQ
 
-  # ALL that to get to kodi gui notifications
     function _pia_notify() {
         local message displaytime image image_path show_image
-        message="${1:-empty message}"
+      # this bashism allows adding `| tee >( tr '[:space:]' ' ' | _pia_notify)` )`
+      # to any echo for Gui.Notification
+        message="${1:-$(</dev/stdin)}"
+      # but blocks on empty stdin
+
         displaytime="${2:-5000}"
       # set default image file name
         image="${3:-"pia_on_48x48.png"}"
@@ -60,7 +93,7 @@
       [[ -s "${image_path}/${image}" ]] \
       && show_image=',"image":"'"${image_path}/${image}"'"'
 
-      status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${showimage}"' }, "id": 1} '))"
+      status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message:-lorem ipsum dolor sit amet}"'" , "displaytime": '"${displaytime}"''"${showimage}"' }, "id": 1} '))"
 
         [[ "$status" =~ OK ]] \
         || return 1
