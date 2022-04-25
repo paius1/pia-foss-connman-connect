@@ -1,6 +1,20 @@
 # Manual PIA VPN Connections for Connman/coreELEC
 
-This repository take the scripts from https://github.com/pia-foss/manual-connections (slightly modified) and uses them to create a valid connman vpn config file for use with coreelec __TL/DR__:  
+This repository take the scripts from https://github.com/pia-foss/manual-connections (slightly modified) and uses them to create a valid connman vpn config file for use with coreelec  
+  
+  With entware wireguard tools I tried  
+  &ensp;wg-quick returns:  
+  ```
+  /opt/bin/wg-quick: line 32: resolvconf: command not found  
+  ```
+  &ensp;&ensp;remove DNS =  
+  ```
+  iptables-restore v1.8.7 (legacy): iptables-restore: unable to initialize table 'raw'  
+  ```
+  &ensp;&ensp;AllowedIPs = 0.0.0.0/1, 128.0.0.0/1  
+  &ensp;can't even ping 8.8.8.8  
+  
+__TL/DR__:  
 
 ```
   git clone https://github.com/pia-foss/manual-connections.git
