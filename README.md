@@ -173,7 +173,11 @@ Here is a list of scripts you could find useful:
 ## Thanks
 Private Internet Access for making a cli interface available
 
-A big special thanks to [faireOwl](https://github.com/faireOwl) for his contributions to the pia-foss repository.
-
+A big special thanks to [faireOwl](https://github.com/faireOwl) for his contributions to the pia-foss repository.  
+  
+https://github.com/thrnz/docker-wireguard-pia/blob/master/extra/pf.sh  
+https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh  
+&emsp; for bind_port_response payload_and_signature
+  
 ## License
 This project is licensed under the [MIT (Expat) license](https://choosealicense.com/licenses/mit/), which can be found [here](/LICENSE).
