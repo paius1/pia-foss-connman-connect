@@ -28,17 +28,17 @@
   #     _pia_notify 'message' 'display time' 'image file' #
   # and logging function
   #     _logger 'message' [ logfile ]
-    [ -z "${kodi_user}" ] \
-    && source ./kodi_assets/functions #
+    [[ -z "${kodi_user}" ]] \
+      && source ./kodi_assets/functions #
 
   # running from favourites and a systemd service file exits then use systemd
   # 1) unit exists 2) not called by systemd, and 3) not running in a shell #
     if
-    [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]] \
-    && \
     [[ -z "${PRE_UP_RUN+y}" ]] \
-    && \
-    [[ ! -t 0 && ! -n "${SSH_TTY}" ]]
+      && \
+    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
+      && \
+    [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]] #
   # systemd service exists, not called, and we are running non-interactively  
     then systemd-cat -t pia-wireguard.favourites -p warning <<< "Stopping pia-wireguard.service from outside of systemd"
        # log this in pia-wireguard log #
@@ -46,20 +46,37 @@
 
          systemctl stop pia-wireguard.service &
          exit 0
+    elif
+    [[ -t 0 || -n "${SSH_TTY}" ]] \
+      && \
+    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
+  # Running interactively with systemd service #
+    then SERVICE_STATE="$(systemctl is-active  pia-wireguard.service)" #
+         if [[ "${SERVICE_STATE}" =~ ^a ]] #
+       # Service is running #
+         then # notify systemd
+              systemd-cat -t pia-wireguard.cmdline -p warning <<< "Stopping pia-wireguard.service from the command line" #
+            # Stop pia-wireguard service This runs runs ./shutdown.sh with PRE_UP_RUN set #
+              systemctl stop pia-wireguard.service & #
+              exit 0
+         else PRE_UP_RUN='cli'
+       # clean up _logger messages
+         fi
     fi
 
   # Get user defined iptables rules
     source .env 2>/dev/null
 
   # Disconnect VPN
+  # First service is connected service, is it a vpn?
     wg_0="$(connmanctl services | awk 'NR == 1 && /vpn_/ {print $NF}')"
     if [[ -n "${wg_0}" ]]
   # Vpn active
     then _logger "$(connmanctl disconnect "${wg_0}")"
        # GUI Notification
-         REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )"
+         REGION="$(/opt/bin/jq -r '.name' < /opt/etc/wireguard/regionData )"
          [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
-            && _pia_notify 'Disconnected from '"${REGION}"' '
+           && _pia_notify 'Disconnected from '"${REGION}"' '
     else _logger "No current vpn connection"
     fi
 
@@ -68,7 +85,7 @@
   # restore firewall
   # user defined or ./openrules.v4
     iptables-restore < "${MY_FIREWALL:-openrules.v4}"
-    _logger "restored the  firewall"
+    _logger "restored the firewall to ${MY_FIREWALL:-openrules.v4}"
 
   # Check if we can dig it
     if ! dig +time=1 +tries=2 privateinternetaccess.com >/dev/null
@@ -90,6 +107,7 @@
     nameserver "${nameserver}"
 EOF
          fi
+    else _logger "Can resolve hostnames"
     fi
 
     pf_pids=($(pidof port_forwarding.sh))
@@ -101,10 +119,14 @@ EOF
          :> /tmp/port_forward.log
     fi
 
-  # flush vpn from routing table
-    ip_flush="$(sed 's/^vpn_//;s/_/\./g' <<< "${wg_0}")"
-    ip route flush "${ip_flush}" 
-    _logger "flushed vpn ${ip_flush} from routing table"
+  # flush vpn from routing table?
+    if [[ -n "${wg_0}" ]]
+  # PIA was connected. if disconnected from settings this will be missed
+    then # could try comparing original routing table
+         ip_flush="$(sed 's/^vpn_//;s/_/\./g' <<< "${wg_0}")"
+         ip route flush "${ip_flush}" 
+         _logger "flushed vpn ${ip_flush} from routing table"
+    fi
 
 # add anything else such stopping applications and port forwarding
 exit 0
