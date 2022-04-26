@@ -33,6 +33,7 @@
   # Sllows calling script with an alternate log as an argument
     LOG="${1:-${log}}"
 
+  # CHECK FOR SYSTEM STARTUP
     if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]]
   # System has just started wait, and save a copy of /etc/resolv.conf and the routing table
     then _logger "System Startup waiting..."
