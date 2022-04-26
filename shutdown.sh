@@ -76,7 +76,7 @@
        # GUI Notification
          REGION="$(/opt/bin/jq -r '.name' < /opt/etc/wireguard/regionData )"
          [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
-           && _pia_notify 'Disconnected from '"${REGION}"' '
+           && _pia_notify 'Disconnected from '"${REGION}"' ' 5000 "pia_off_48x48.png"
     else _logger "No current vpn connection"
     fi
 
