@@ -22,7 +22,7 @@
 # modified for coreELEC/connman plgroves gmail 2022 #
 # hard coded/changed paths #
 # added 1 second to the curl timeout to ensure non-zero replies #
-# added kodi OSNotifications #
+# added kodi Gui.Notifications #
 
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
@@ -254,7 +254,8 @@ else # PREFERRED_REGION selectedRegion != none #
 fi
 
 get_selected_region_data
-    echo "$regionData" > /tmp/regionData #
+  # Save $regionData for later recall of region and region name #
+    echo "$regionData" > /opt/etc/wireguard/regionData #
 bestServer_meta_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].ip') #
 bestServer_meta_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].cn') #
 bestServer_WG_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].ip') #
