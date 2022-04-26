@@ -29,7 +29,7 @@
     then >&2 _logger "Finishing up ..."; fi
 
   # by moving out of connect_to...sh we lost $SERVICE and $REGION_NAME
-    eval "$(</tmp/connman.vars )"
+    eval "$(</storage/.config/wireguard/connman.vars )"
 
   # Connect with connmanctl
     if connmanctl connect "${SERVICE}"
@@ -75,7 +75,7 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
     fi #
 
   # moved from connect_to_wireguard.sh thus losing all the variables
-    eval "$(awk -F'/' '{print $1}' /tmp/port_forward.cmd )"
+    eval "$(awk -F'/' '{print $1}' /opt/etc/piavpn-manual/port_forward.cmd )"
 
   # This section did exit the script if PIA_PF is not set to "true".
   # the command for port forwarding will be sent to /tmp/port_forward.log
@@ -97,8 +97,8 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
 
        # allow rest of post_up.sh to run
          (sleep 2
-          chmod +x /tmp/port_forward.cmd
-          eval /tmp/port_forward.cmd >> /tmp/port_forward.log 2>/dev/null
+          chmod +x /opt/etc/piavpn-manual/port_forward.cmd
+          eval /opt/etc/piavpn-manual/port_forward.cmd >> /tmp/port_forward.log 2>/dev/null
            )&
          disown
     fi #
