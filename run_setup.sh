@@ -39,63 +39,60 @@
 
     export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
 
-  # add kodi GUI.Notifications with timeouts and images #
+  # add kodi GUI.Notifications #
   #     _pia_notify 'message' 'display time' 'image file' #
-  # and logging function _logger 'message' [ logfile ] #
+  # and logging #
+  #     _logger 'message' [ logfile ] #
     [ -z "${kodi_user}" ] \
     && source ./kodi_assets/functions #
 
-  # running from favourites and a systemd service file exits: use systemd #
-  # 1) unit exists 2) not called by systemd, and 3) not running in a shell #
+  # How was this script called
     if #
-    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] \
-    && \
     [[ -z "${PRE_UP_RUN+y}" ]] \
-    && \
-    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
-  # systemd service exists, not called, and we are running non-interactively #
+      && \
+    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
+      && \
+    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
+  # Not called by systemd, not running in a shell, and systemd service exists #
     then systemd-cat -t pia-wireguard.favourites -p warning <<< "(Re)starting pia-wireguard.service from outside of systemd" #
        # log this in pia-wireguard log #
          LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' #
        # optional Gui notificaton #
-         _pia_notify 'Called outside of systemd service is '" $(systemctl is-active  pia-wireguard.service)"'' ; sleep 5 #
+         #_pia_notify 'Called outside of systemd service is '" $(systemctl is-active  pia-wireguard.service)"'' ; sleep 5 #
          if systemctl --quiet is-active  pia-wireguard.service #
        # pia-wireguard is running. (Re)start. #
          then systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service is restarting" #
-
               systemctl restart pia-wireguard.service & #
-
          else systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service is starting" #
        # pia-wireguard is not running. start. #
-
               systemctl start pia-wireguard.service & #
-
          fi #
          exit 0 #
-    elif  #
-    [[ -t 0 || -n "${SSH_TTY}" ]] && \
-    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
-  # Have a service file and running interactively #
-    then SERVICE_STATE="$(systemctl is-active  pia-wireguard.service)" #
-         if [[ "${SERVICE_STATE}" =~ ^a ]] #
-       # Service is running #
-         then read -r -p "PIA Wireguard is running, continue? ([N]o/[y]es): " continue #
-              grep -ivq y <<< "${continue:0:1}" \
-                          && { echo "Goodbye"; exit 1; } #
-#         else
-       # Send a message to systemd journal regarding this #
-         systemd-cat -t pia-wireguard.cmdline -p warning <<< "Stopping pia-wireguard.service from the command line" #
-       # Stop pia-wireguard service
-         systemctl stop pia-wireguard.service #
-         fi #
-else _pia_notify 'Called by systemd   '" $(systemctl is-active  pia-wireguard.service)"'' #; sleep 5
+    elif
+    [[ -z "${PRE_UP_RUN+y}" ]] \
+       && \
+    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+  # No systemd journal so set LOG #
+    then export LOG="${LOG:-/tmp/pia-wireguard.log}"
+         _logger "found no systemd service logging to ${LOG}"
+         _pia_notify "logging to ${LOG}"
+       # Force displaytime
+         sleep 5
+    elif [[ -z "${PRE_UP_RUN+y}" ]]
+  # running in a shell
+    then export PRE_UP_RUN='cli'
     fi #
 
-  # systemd would check for non empty .env file, so should we #
+  # systemd checks for non empty .env file, so should we #
   #     ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env & $PRE_UP_RUN #
     if [[ -s .env ]] #
   # read variables for .env file #
-    then source .env  #
+    then 
+         source .env  #
+         _logger "Loaded .env file"
+    elif [[ -t 0 || -n "${SSH_TTY}" ]] #
+  # running interactively w/o a .env file #
+    then echo "Get ready to rumble" #
     else _pia_notify "No valid PIA config -> $(pwd)/.env" 10000 #
   # Fail without minimal .env file #
          sleep 10
@@ -128,15 +125,47 @@ else _pia_notify 'Called by systemd   '" $(systemctl is-active  pia-wireguard.se
       # if you want to use a custom set of iptables rules then define them here #
       #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4 #
       #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
+#####
 
-  #            VARIABLE CHECK               #
-  #     SKIPPED IF RUNNING INTERACTIVELY    #
+  # Check for changes in .env #
+    if #
+    [[ "${PRE_UP_RUN}" != 'cli' ]] \
+      && \
+    [[ -s /opt/etc/wireguard/sha1sum.env ]] #
+  # not running interactively, have checksum for previous .env #
+    then _logger "    Checking current .env file with previous" #
+         if [[ $(</opt/etc/wireguard/sha1sum.env) = $(sha1sum .env) ]] #
+       # .env is unchanged #
+         then _logger "        .env is unchanged" #
 
+              if [[ $(_interval $(_created ~/.config/wireguard/pia.config)) -lt $((24*60*60)) ]] #
+            # wireguard/pia.config is less that 24 hours old   #
+              then _logger "        pia.config is recent" #
+                 # call ./post_up.sh   #
+                   case "${PRE_UP_RUN}" in #
+                        t*) exit 0 ;; #
+                      # systemd calls ./post_up.sh  
+                        *)  ./post_up.sh & exit 0 ;; #
+                   esac
+              fi #
+         else  _logger "The .env file has changed, running thru setup" #
+       # Save new checksum for new file #
+               sha1sum .env > /opt/etc/wireguard/sha1sum.env #
+         fi #
+    elif ! [[ -s /opt/etc/wireguard/sha1sum.env ]] #
+  # create /opt/etc/wireguard/sha1sum.env #
+    then sha1sum .env > /opt/etc/wireguard/sha1sum.env #
+         echo "saving sha1sum .env > /opt/etc/wireguard/sha1sum.env" #
+    else echo "skipped checksum and .env check" #
+  # running interactively #
+    fi #
+
+  #     NON-INTERACTIVE VARIABLE CHECK               #
     if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
   # running non-interactive kit check" #
     then #
 
-       # display time in ms for important notifications #
+       # display time in ms for important notifications _pia_notify '${BOTHER}' #
        # kodi won't wait so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
          BOTHER=14000 #
 
@@ -144,9 +173,10 @@ else _pia_notify 'Called by systemd   '" $(systemctl is-active  pia-wireguard.se
 
        # Check credentials #
          if #
-         _is_empty "${PIA_USER}" ||  
+         _is_empty "${PIA_USER}" \
+          || 
          _is_empty "${PIA_PASS}" #
-       # NO CREDENTIALS, we can forget it #
+       # NO CREDENTIALS, we can forgetabout it #
          then _pia_notify "Missing PIA Credentials" "${BOTHER}" #
               sleep "$((BOTHER/1000+1))" #
               _pia_notify "CONNECTION FAILED" "$((BOTHER-5000))"#
@@ -154,20 +184,22 @@ else _pia_notify 'Called by systemd   '" $(systemctl is-active  pia-wireguard.se
          fi #
 
        # PREFERRED_REGION|AUTOCONNECT will create a connman config #
-       # AUTOCONNECT|CONNMAN_CONNECT != false|null requires using Settings > CoreELEC > Connections #
+       # AUTOCONNECT|CONNMAN_CONNECT = false|null requires using Settings > CoreELEC > Connections #
        #   and sets no firewall or port forwarding #
          if #
-         _is_empty "${PREFERRED_REGION}" ||  
-         _is_empty "${AUTOCONNECT}" ||  
+         _is_empty "${PREFERRED_REGION}" \
+          || 
+         _is_empty "${AUTOCONNECT}" \
+          || 
          _is_empty "${MAX_LATENCY}" #
        # Set them #
          then 
-              # AUTOCONNECT=true negates set PREFERRED_REGION
                 function _AUTOCONNECT_or_PREFERRED_REGION() { #
+              # AUTOCONNECT=true negates PREFERRED_REGION
                     if [[ "${AUTOCONNECT}" =~ ^t ]] #
                     then echo "the fastest server"
-                         _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "8000" >/dev/null #
-                         sleep 8
+                         _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "$((BOTHER/2))" #
+                         sleep "$((BOTHER/2000))"
                     else echo "${PREFERRED_REGION}" #
                     fi #
                }
@@ -182,14 +214,17 @@ else _pia_notify 'Called by systemd   '" $(systemctl is-active  pia-wireguard.se
                      && MAX_LATENCY="${MAX_LATENCY:=0.05}" #
                      via="the fastest server" #
                 fi #
+         elif _is_empty "${MAX_LATENCY}"
+       # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
+         then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
          fi #
 
-       # BOTHER ABOUT REGION UNSET BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
-         _is_empty   "${PREFERRED_REGION}" \
+       # BOTHER ABOUT PREFERRED_REGION='' BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
+         _is_empty "${PREFERRED_REGION}" \
           && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
                sleep "$((BOTHER/1000))"; } #
 
-       # Set PIA_PF and PIA_DNS and notify of changes #
+       # Set PIA_PF and PIA_DNS. Notify if forcing PIA_DNS #
          PIA_PF="${PIA_PF:-false}" #
 
          if _is_empty "${PIA_DNS}" #
@@ -200,22 +235,19 @@ else _pia_notify 'Called by systemd   '" $(systemctl is-active  pia-wireguard.se
 
          _pia_notify 'getting details for '"${via}"'' #
     fi #
-#############################################################################################
-  # PRE_UP_RUN is set true by systemd. #
+
+  # PRE_UP_RUN is set true by systemd, and 'cli' if -t 0 #
+  # if not set then call ./pre_up.sh
     if [ -z "${PRE_UP_RUN+y}" ] #
-  # No systemd service or running interactively #
-    then # if running interactively set PRE_UP_RUN to shorten log messages #
-         [[ -t 0 || -n "${SSH_TTY}" ]] \
-            && export PRE_UP_RUN='cli' #
-       # in case we don't have a systemd service enabled #
-         export LOG=/tmp/pia-wireguard.log #
-         : > "${LOG}" #
+  # No systemd service or not running interactively #
+    then :> "${LOG}" #
          _logger "Setting up sane environment" #
          ./pre_up.sh #
+         fi #
     fi #
 
 # end of major changes
-########################################################################
+
 # Check if terminal allows output, if yes, define colors for output
 if [[ -t 1 ]]; then
   ncolors=$(tput colors 2>/dev/null)
@@ -483,14 +515,14 @@ For example, you can try 0.2 for 200ms allowed latency.
         i=0
         while read -r line; do
           i=$((i+1))
-                # modified path #
-                time=$( awk 'NR == '$i' {print $1}' /opt/etc/piavpn-manual/latencyList ) #
-                id=$( awk 'NR == '$i' {print $2}' /opt/etc/piavpn-manual/latencyList ) #
-                ip=$( awk 'NR == '$i' {print $3}' /opt/etc/piavpn-manual/latencyList ) #
-                location1=$( awk 'NR == '$i' {print $4}' /opt/etc/piavpn-manual/latencyList ) #
-                location2=$( awk 'NR == '$i' {print $5}' /opt/etc/piavpn-manual/latencyList ) #
-                location3=$( awk 'NR == '$i' {print $6}' /opt/etc/piavpn-manual/latencyList ) #
-                location4=$( awk 'NR == '$i' {print $7}' /opt/etc/piavpn-manual/latencyList ) #
+            # modified path #
+            time=$( awk 'NR == '$i' {print $1}' /opt/etc/piavpn-manual/latencyList ) #
+            id=$( awk 'NR == '$i' {print $2}' /opt/etc/piavpn-manual/latencyList ) #
+            ip=$( awk 'NR == '$i' {print $3}' /opt/etc/piavpn-manual/latencyList ) #
+            location1=$( awk 'NR == '$i' {print $4}' /opt/etc/piavpn-manual/latencyList ) #
+            location2=$( awk 'NR == '$i' {print $5}' /opt/etc/piavpn-manual/latencyList ) #
+            location3=$( awk 'NR == '$i' {print $6}' /opt/etc/piavpn-manual/latencyList ) #
+            location4=$( awk 'NR == '$i' {print $7}' /opt/etc/piavpn-manual/latencyList ) #
           location="$location1 $location2 $location3 $location4"
           printf "%3s : %-8s %-15s %17s" $i "$time" "$ip" "$id"
           echo " - $location"
@@ -523,11 +555,11 @@ For example, you can try 0.2 for 200ms allowed latency.
               # running non-interactively got ordered list choosing fastest #
                 else # choose best region and proceed #
                      PREFERRED_REGION=$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList ) # 
-                     REGION="$(/opt/bin/jq -r '.name' < /tmp/regionData )" #
+                     REGION="$(/opt/bin/jq -r '.name' < /opt/etc/wireguard/regionData )" #
                      export PREFERRED_REGION #
                      _pia_notify 'Selected for '"${REGION}"'' #
                 fi #
-      else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]] #
+      else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
            if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
          # RUNNING NON-INTERACTIVELY #
            then #
