@@ -315,8 +315,8 @@ echo -e "${green}OK!${nc}"
          ./pre_up.sh #
     fi #
 
-  # Save for use by scripts when not run in order #
-    echo -e "SERVICE=\"${SERVICE}\"\n REGION_NAME=\"${REGION_NAME}\"" > /tmp/connman.vars #
+  # Save for use by scripts when not run in order
+    echo -e "SERVICE=\"${SERVICE}\"\n REGION_NAME=\"${REGION_NAME}\"" > /storage/.config/wireguard/connman.vars
 
   # if called outside of systemd, then run ./post_up.sh manually #
     if [[ "${PRE_UP_RUN}" != 'true' ]] #
