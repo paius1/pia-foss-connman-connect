@@ -125,7 +125,6 @@
       # if you want to use a custom set of iptables rules then define them here #
       #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4 #
       #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
-#####
 
   # Check for changes in .env #
     if #
@@ -197,9 +196,9 @@
                 function _AUTOCONNECT_or_PREFERRED_REGION() { #
               # AUTOCONNECT=true negates PREFERRED_REGION
                     if [[ "${AUTOCONNECT}" =~ ^t ]] #
-                    then echo "the fastest server"
+                    then echo "the fastest server" #
                          _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "$((BOTHER/2))" #
-                         sleep "$((BOTHER/2000))"
+                         sleep "$((BOTHER/2000))" #
                     else echo "${PREFERRED_REGION}" #
                     fi #
                }
