@@ -641,7 +641,7 @@ if ! command -v resolvconf &>/dev/null && [[ $VPN_PROTOCOL == "wireguard" ]]; th
           echo #
      fi #
   setDNS="no"
-  # coreelec does not have resolvconf; we can modify the /etc/resolv.conf modified by connman #
+  # coreelec does not have resolvconf; we can modify the /run/connman/resolv.conf modified by connman #
      setDNS="yes" #
 fi
 

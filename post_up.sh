@@ -62,14 +62,13 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
     if [[ "${PIA_DNS:-true}" == "true" ]] #
   # Check and reset nameservers set by connmanctl #
     then DNS="${DNS:-$(awk '/WireGuard.DNS/{printf "%s", $3}'  ~/.config/wireguard/pia.config)}" #
-         if [[ "$(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf)" != "${DNS}" ]] #
+         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${DNS}" ]] #
        # connman subordinates vpn dns to any preset nameservers #
          then _logger "Replacing Connman's DNS with PIA DNS" #
             # replace headers and first nameserver with $DNS to temporary file
-              sed -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
-                     /etc/resolv.conf > /tmp/resolv.conf #
+              sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
+                     /run/connman/resolv.conf #
             # overcome editing a file in place
-              cat /tmp/resolv.conf > /etc/resolv.conf && rm /tmp/resolv.conf #
               echo #
          fi #
     fi #
