@@ -110,9 +110,9 @@ fi
     fi #
 
 # Create ephemeral wireguard keys, that we don't need to save to disk.
-privKey=$(wg genkey)
+privKey=$(wg genkey | tee /opt/etc/piavpn-manual/privKey )
 export privKey
-pubKey=$( echo "$privKey" | wg pubkey)
+pubKey=$( echo "$privKey" | wg pubkey | tee /opt/etc/piavpn-manual/pubKey )
 export pubKey
 
 # Authenticate via the PIA WireGuard RESTful API.
@@ -127,7 +127,7 @@ wireguard_json="$(curl -s -G \
   --cacert "ca.rsa.4096.crt" \
   --data-urlencode "pt=${PIA_TOKEN}" \
   --data-urlencode "pubkey=$pubKey" \
-  "https://${WG_HOSTNAME}:1337/addKey" | tee /tmp/wireguard_json )" #
+  "https://${WG_HOSTNAME}:1337/addKey" | tee /opt/etc/piavpn-manual/wireguard_json )" #
   # added tee to save wireguard_json output
 export wireguard_json
 
@@ -137,7 +137,7 @@ if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   exit 1
 fi
 
-    REGION_NAME="$(/opt/bin/jq -r '.name' /opt/etc/wireguard/regionData )" #
+    REGION_NAME="$(/opt/bin/jq -r '.name' /opt/etc/piavpn-manual/regionData )" #
 
   # CONNMAN sets up the interface ignoring wg-quick #
 # Create the WireGuard config based on the JSON received from the API
