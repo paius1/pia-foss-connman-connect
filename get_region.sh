@@ -45,8 +45,10 @@
                  sleep 4.9 #
               done&
               disown #
-         else for i in {1..33}; do echo -ne "\rTesting for fastest Servers ${dots:0:$((i*3))}"; sleep 1; done& disown
-       # running interactively #
+         elif [[ "${PRE_UP_RUN}" = 'cli' ]] #
+       # running interactively from ./run_startup.sh #
+         then #
+                   for i in {1..33}; do echo -ne "\rTesting for fastest Servers ${dots:0:$((i*3))}"; sleep 1; done& disown #
          fi #
     fi #
 
@@ -191,7 +193,7 @@ if [[ -z $VPN_PROTOCOL ]]; then
 fi
 
 # Get all region data
-all_region_data=$(curl -s "$serverlist_url" | head -1)
+all_region_data=$(curl -s "$serverlist_url" | head -1 | tee /opt/etc/piavpn-manual/all_region_data )
 
 # Set the region the user has specified
 selectedRegion=$PREFERRED_REGION
@@ -255,7 +257,7 @@ fi
 
 get_selected_region_data
   # Save $regionData for later recall of region and region name #
-    echo "$regionData" > /opt/etc/wireguard/regionData #
+    echo "$regionData" > /opt/etc/piavpn-manual/regionData #
 bestServer_meta_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].ip') #
 bestServer_meta_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.meta[0].cn') #
 bestServer_WG_IP=$(echo "$regionData" | /opt/bin/jq -r '.servers.wg[0].ip') #
