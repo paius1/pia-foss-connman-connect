@@ -59,10 +59,10 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
          exit 255 #
     fi #
 
-    if [[ $PIA_DNS == "true" ]] #
+    if [[ "${PIA_DNS:-true}" == "true" ]] #
   # Check and reset nameservers set by connmanctl #
-    then #
-         if [ "$(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf)" != "${DNS}" ] #
+    then DNS="${DNS:-$(awk '/WireGuard.DNS/{printf "%s", $3}'  ~/.config/wireguard/pia.config)}" #
+         if [[ "$(awk '/nameserver / {print $NF; exit}' /etc/resolv.conf)" != "${DNS}" ]] #
        # connman subordinates vpn dns to any preset nameservers #
          then _logger "Replacing Connman's DNS with PIA DNS" #
             # replace headers and first nameserver with $DNS to temporary file
