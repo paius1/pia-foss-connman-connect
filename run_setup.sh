@@ -130,10 +130,10 @@
     if #
     [[ "${PRE_UP_RUN}" != 'cli' ]] \
       && \
-    [[ -s /opt/etc/wireguard/sha1sum.env ]] #
+    [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
   # not running interactively, have checksum for previous .env #
     then _logger "    Checking current .env file with previous" #
-         if [[ $(</opt/etc/wireguard/sha1sum.env) = $(sha1sum .env) ]] #
+         if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
        # .env is unchanged #
          then _logger "        .env is unchanged" #
 
@@ -147,14 +147,14 @@
                         *)  ./post_up.sh & exit 0 ;; #
                    esac
               fi #
-         else  _logger "The .env file has changed, running thru setup" #
+         else  _logger "        .env file has changed, running thru setup" #
        # Save new checksum for new file #
-               sha1sum .env > /opt/etc/wireguard/sha1sum.env #
+               sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          fi #
-    elif ! [[ -s /opt/etc/wireguard/sha1sum.env ]] #
-  # create /opt/etc/wireguard/sha1sum.env #
-    then sha1sum .env > /opt/etc/wireguard/sha1sum.env #
-         echo "saving sha1sum .env > /opt/etc/wireguard/sha1sum.env" #
+    elif ! [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
+  # create /opt/etc/piavpn-manual/sha1sum.env #
+    then sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
+         echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
     else echo "skipped checksum and .env check" #
   # running interactively #
     fi #
@@ -227,7 +227,7 @@
          PIA_PF="${PIA_PF:-false}" #
 
          if _is_empty "${PIA_DNS}" #
-         then PIA_DNS='true' #
+         then export PIA_DNS='true' #
               _pia_notify "FORCED PIA DNS" #
               sleep 2
          fi #
@@ -554,7 +554,7 @@ For example, you can try 0.2 for 200ms allowed latency.
               # running non-interactively got ordered list choosing fastest #
                 else # choose best region and proceed #
                      PREFERRED_REGION=$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList ) # 
-                     REGION="$(/opt/bin/jq -r '.name' < /opt/etc/wireguard/regionData )" #
+                     REGION="$(/opt/bin/jq -r '.name' < /opt/etc/piavpn-manual/regionData )" #
                      export PREFERRED_REGION #
                      _pia_notify 'Selected for '"${REGION}"'' #
                 fi #
