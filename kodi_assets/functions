@@ -6,7 +6,7 @@
   #     _pia_notify 'message' 'display time' 'image file'
   # logging function
   #     _logger 'message' [ logfile ]
-  # check for .env changes
+  # check for .env file changes
   # check for empty variables
 
   # credentials for local kodi
@@ -18,9 +18,7 @@
   # logs to systemd journal, and/or screen and log file
     function _logger() {
       local message log source tab spaces 
-      # this bashism allows adding echo blahblahblah `| tee >( tr '[:space:]' ' ' | _logger)`
-        message="${1-$(</dev/stdin)}"
-      # but blocks on empty stdin
+        message="${1:-lorem ipsum dolor sit amet}"
         log="${2:-$LOG}"
       # in case $LOG is not set
         log="${log:-/dev/null}"
@@ -33,7 +31,7 @@
         then
              printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
            # cat to systemd journal
-           #  systemd-cat -t pia-wireguard -p warning <<< "${message}"
+             #systemd-cat -t pia-wireguard -p warning <<< "${message}"
         else echo "${message}"
       # send message to stdout
         fi
@@ -105,6 +103,7 @@
  }
     export -f _interval
 
+  # check variable empty of unset
     function _is_empty() {
         [[ -z "${1}" ]]
  } #
