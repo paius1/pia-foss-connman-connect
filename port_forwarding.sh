@@ -38,6 +38,11 @@
     [[ -z "${kodi_user}" ]] \
        && source ./kodi_assets/functions #
 
+# DEBUGGING
+#LOG="${LOG:-/tmp/pia-wireguard.log}"
+#_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
+#exec > >(tee -a $LOG) #2>&1
+
   # this can be run separately
     [[ -t 0 || -n "${SSH_TTY}" ]] \
        && export PRE_UP_RUN='cli' #

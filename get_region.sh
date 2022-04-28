@@ -33,6 +33,11 @@
     [[ -z "${kodi_user}" ]] \
        && source ./kodi_assets/functions #
 
+# DEBUGGING # systemd logs to journal env LOG=/dev/null
+#LOG="${LOG:-/tmp/pia-wireguard.log}"
+#_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
+#exec > >(tee -a $LOG) #2>&1
+
   # Progress... run while waiting for server list #
     if [[ "${IVE_RUN}" -eq 0 ]] || [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
   # keep sending notification while servers are being read quessed at 40 seconds #   

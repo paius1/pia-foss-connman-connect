@@ -31,6 +31,11 @@
     [[ -z "${kodi_user}" ]] \
       && source ./kodi_assets/functions #
 
+# DEBUGGING
+#LOG="${LOG:-/tmp/pia-wireguard.log}"
+#_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
+#exec > >(tee -a $LOG) #2>&1
+
   # running from favourites and a systemd service file exits then use systemd
   # 1) unit exists 2) not called by systemd, and 3) not running in a shell #
     if
@@ -76,7 +81,7 @@
        # GUI Notification
          REGION="$(/opt/bin/jq -r '.name' < /opt/etc/piavpn-manual/regionData )"
          [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
-           && _pia_notify 'Disconnected from '"${REGION}"' ' 5000 "pia_off_48x48.png"
+           && _pia_notify 'Disconnected from '"${REGION}"' ' 7000 "pia_off_48x48.png"
     else _logger "No current vpn connection"
     fi
 

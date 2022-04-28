@@ -25,6 +25,11 @@
     [[ -z "${kodi_user}" ]] \
       && source ./kodi_assets/functions #
 
+# DEBUGGING
+#LOG="${LOG:-/tmp/pia-wireguard.log}"
+#_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
+#exec > >(tee -a $LOG) #2>&1
+
     if [[ "${PRE_UP_RUN+y}" != 'true' ]]
     then >&2 _logger "Finishing up ..."; fi
 

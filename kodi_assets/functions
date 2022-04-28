@@ -17,13 +17,13 @@
 
   # logs to systemd journal, and/or screen and log file
     function _logger() {
-      local message log source tab spaces 
+        local message log source tab spaces date
 
-      # this bashism allows adding `| tee >(_logger [log [source]] )` to any `echo`
-        if [ ! -t 0 ] 
-        then
-             new_one="$(tr '[:space:]' ' ' < /dev/stdin)"
-             set -- "${new_one}" "${@:1:2}"
+        if read -t 0
+      # there is something in stdin put it in ${@:1}
+        then read -r new_one
+             [[ -n "${new_one}" ]] \
+               && set -- "${new_one}" "${@:1:2}"
         fi
         #
         message="${1:-lorem ipsum dolor sit amet}"
@@ -33,11 +33,12 @@
         source="${3:-$(caller)}"
         tab=$((${#source}+1))
         IFS="" spaces="$(printf "%$((tab*2))s")"
-
+        TZ="$( awk -F, 'END {print $1}' < <(strings /etc/localtime))"
+        date="$(TZ="${TZ}" /opt/bin/date)"
         if [[ -z "${PRE_UP_RUN+y}" ]]
       # Running non-interactively but not from systemd: print to stdout and $log
         then
-             printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "$(date)" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
+             printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
            # cat to systemd journal
              #systemd-cat -t pia-wireguard -p warning <<< "${message}"
         else echo "${message}"
@@ -66,11 +67,11 @@
     function _pia_notify() {
         local message displaytime image image_path show_image
 
-      # this bashism allows adding `| tee >(_pia_notify [displaytime [image]] )` to any `echo`
-        if [ ! -t 0 ] 
-        then
-             new_one="$(tr '[:space:]' ' ' < /dev/stdin)"
-             set -- "${new_one}" "${@:1:2}"
+        if read -t 0
+      # there is something in stdin put it in ${@:1}
+        then read -r new_one
+             [[ -n "${new_one}" ]] \
+               && set -- "${new_one}" "${@:1:2}"
         fi
         #
         message="${1:-lorem ipsum dolor sit amet}"
@@ -116,3 +117,12 @@
         [[ -z "${1}" ]]
  } #
     export -f _is_empty
+
+    function _hmmss() {
+        local time="$1"
+        local h m s
+        ((s=time%60, time/=60, m=time%60, h=time/60))
+        printf "%d hrs %02d mins %02d secs" "${h#-}" "${m#-}" "${s#-}"
+ }
+    export -f _hmmss
+

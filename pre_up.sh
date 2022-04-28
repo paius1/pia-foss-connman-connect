@@ -27,6 +27,11 @@
     [ -z "${kodi_user}" ] \
     && source ./kodi_assets/functions #
 
+# DEBUGGING
+#export LOG='/tmp/pia-wireguard.log'
+#_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
+#exec > >(tee -a $LOG) #2>&1
+
   # kodi System.Exec doesn't allow arguments so we need to setup logging
   # systemd sets LOG=/dev/null if not set to /tmp/pia-wireguard.log
     log="${LOG:-/tmp/pia-wireguard.log}"

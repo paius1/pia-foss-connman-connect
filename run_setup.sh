@@ -46,7 +46,12 @@
     [ -z "${kodi_user}" ] \
     && source ./kodi_assets/functions #
 
+# DEBUGGING # systemd logs to journal env LOG=/dev/null
+LOG="${LOG:-/tmp/pia-wireguard.log}"
+exec > >(tee -a $LOG) #2>&1
+
   # How was this script called
+  # does pia-wireguard.service exist. Are we using it?
     if #
     [[ -z "${PRE_UP_RUN+y}" ]] \
       && \
@@ -79,7 +84,7 @@
        # Force displaytime
          sleep 5
     elif [[ -z "${PRE_UP_RUN+y}" ]]
-  # running in a shell
+  # Running in a shell "logs" to terminal
     then export PRE_UP_RUN='cli'
     fi #
 
@@ -135,11 +140,11 @@
     then _logger "    Checking current .env file with previous" #
          if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
        # .env is unchanged #
-         then _logger "        .env is unchanged" #
-
-              if [[ $(_interval $(_created ~/.config/wireguard/pia.config)) -lt $((24*60*60)) ]] #
+         then _logger "    .env is unchanged" #
+              age_env="$(_interval $(_created ~/.config/wireguard/pia.config))" #
+              if [[ "${age_env}" -lt $((24*60*60)) ]] #
             # wireguard/pia.config is less that 24 hours old   #
-              then _logger "        pia.config is recent" #
+              then _logger "    pia.config is $(_hmmss ${age_env}) old" #
                  # call ./post_up.sh   #
                    case "${PRE_UP_RUN}" in #
                         t*) exit 0 ;; #
@@ -155,7 +160,6 @@
   # create /opt/etc/piavpn-manual/sha1sum.env #
     then sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
-    else echo "skipped checksum and .env check" #
   # running interactively #
     fi #
 
