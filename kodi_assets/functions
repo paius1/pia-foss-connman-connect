@@ -18,6 +18,11 @@
   # logs to systemd journal, and/or screen and log file
     function _logger() {
       local message log source tab spaces 
+
+      # this bashism allows adding `| tee >(_logger [log [source]] )` to any `echo`
+        [[ ! -t 0 ]] \
+          && set -- "$(tr '[:space:]' ' ' < /dev/stdin)" "$@"
+        #
         message="${1:-lorem ipsum dolor sit amet}"
         log="${2:-$LOG}"
       # in case $LOG is not set
@@ -58,14 +63,11 @@
     function _pia_notify() {
         local message displaytime image image_path show_image
 
-      # this bashism allows adding `| tee >(_pia_notify - [displaytime [image]] )` to any `echo`
-        if ! [[ -t 0 || -n "${SSH_TTY}" ]]
-      # echo `| tee >(_pia_notify)` to Gui.Notifications
-        then message="${1:-$(tr '[:space:]' ' ' < /dev/stdin)}"
-        else message="${1:-lorem ipsum dolor sit amet}"
-      # but don't block on empty stdin
-        fi
+      # this bashism allows adding `| tee >(_pia_notify [displaytime [image]] )` to any `echo`
+        [[ ! -t 0 ]] \
+          && set -- "$(tr '[:space:]' ' ' < /dev/stdin)" "$@"
         #
+        message="${1:-lorem ipsum dolor sit amet}"
         displaytime="${2:-5000}"
       # set default image file name
         image="${3:-"pia_on_48x48.png"}"
@@ -93,7 +95,7 @@
 
   # interval between now and then
     function _interval() {
-        local now then
+        local now 'then'
         then="${1:-1}"
     
         now="$(printf '%(%s)T' \
