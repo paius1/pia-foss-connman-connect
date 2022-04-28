@@ -20,8 +20,11 @@
       local message log source tab spaces 
 
       # this bashism allows adding `| tee >(_logger [log [source]] )` to any `echo`
-        [[ ! -t 0 ]] \
-          && set -- "$(tr '[:space:]' ' ' < /dev/stdin)" "$@"
+        if [ ! -t 0 ] 
+        then
+             new_one="$(tr '[:space:]' ' ' < /dev/stdin)"
+             set -- "${new_one}" "${@:1:2}"
+        fi
         #
         message="${1:-lorem ipsum dolor sit amet}"
         log="${2:-$LOG}"
@@ -64,8 +67,11 @@
         local message displaytime image image_path show_image
 
       # this bashism allows adding `| tee >(_pia_notify [displaytime [image]] )` to any `echo`
-        [[ ! -t 0 ]] \
-          && set -- "$(tr '[:space:]' ' ' < /dev/stdin)" "$@"
+        if [ ! -t 0 ] 
+        then
+             new_one="$(tr '[:space:]' ' ' < /dev/stdin)"
+             set -- "${new_one}" "${@:1:2}"
+        fi
         #
         message="${1:-lorem ipsum dolor sit amet}"
         displaytime="${2:-5000}"
