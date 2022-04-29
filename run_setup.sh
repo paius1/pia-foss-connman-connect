@@ -152,8 +152,8 @@ exec > >(tee -a $LOG) #2>&1
                         *)  ./post_up.sh & exit 0 ;; #
                    esac
               fi #
-         else  _logger "        .env file has changed, running thru setup" #
-       # Save new checksum for new file #
+         else  _logger "      .env file has changed, running thru setup" #
+       # Save checksum for new file #
                sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          fi #
     elif ! [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
@@ -170,7 +170,7 @@ exec > >(tee -a $LOG) #2>&1
 
        # display time in ms for important notifications _pia_notify '${BOTHER}' #
        # kodi won't wait so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
-         BOTHER=14000 #
+         export BOTHER=14000 #
 
          function _is_empty() { [[ -z "${1}" ]]; } #
 
@@ -247,7 +247,6 @@ exec > >(tee -a $LOG) #2>&1
          _logger "Setting up sane environment" #
          ./pre_up.sh #
          fi #
-    fi #
 
 # end of major changes
 
@@ -279,7 +278,7 @@ fi
     # changed paths from /opt/ #
     # and commented rm token as it can be used for 24 hrs #
     #rm -f /opt/etc/piavpn-manual/token /opt/etc/piavpn-manual/latencyList #
-    rm -f /opt/etc/piavpn-manual/latencyList #
+    #rm -f /opt/etc/piavpn-manual/latencyList #
 
 # Retry login if no token is generated
 while :; do
@@ -440,7 +439,7 @@ else
   selectServer="no"
 fi
   # pia-foss manual connections does not export AUTOCONNECT #
-  # do we need to?  #
+  # needed at connection step in post_up.sh  #
     export AUTOCONNECT #
 # Prompt the user to specify a server or auto-connect to the lowest latency
 while :; do
