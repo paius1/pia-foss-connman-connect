@@ -73,9 +73,11 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
             # replace headers and first nameserver with $DNS to temporary file
               sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
                      /run/connman/resolv.conf #
-            # overcome editing a file in place
               echo #
          fi #
+       # https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
+         #DNS_SERVER="$(./dnsleaktest.py | awk -F"by" ' /by/{print $2; exit}')"
+         #_pia_notify 'DNS server is '"${DNS_SERVER}"' ' 10000; sleep 9
     fi #
 
   # moved from connect_to_wireguard.sh thus losing all the variables
