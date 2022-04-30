@@ -9,7 +9,7 @@
   # get file creation time 
   # check interval now and then
   # convert seconds to 'X hrs Y mins Z secs'
-  # check for empty/unset variables
+  # check for empty/unset variables n.b. test unset passes VARIABLE NAME ONLY
   # run is interactive or not
 
   # credentials for local kodi
@@ -42,7 +42,7 @@
       # running non-interactively but not from systemd: print to stdout and $log
         _is_unset PRE_UP_RUN \
         && \
-        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message} ${source} ${tab}" $'\n'| tee -a "${log}" \
+        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}" \
         ||
         echo "${message}"
       # send message to stdout

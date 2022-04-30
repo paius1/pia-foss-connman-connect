@@ -27,7 +27,7 @@
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
-    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
+    export PATH=/opt/bin:/opt/sbin:"${PATH}" #
 
   # Gui Notifications #
     [[ -z "${kodi_user}" ]] \
@@ -39,10 +39,13 @@
 #exec > >(tee -a $LOG) #2>&1
 
   # Progress... run while waiting for server list #
-    if [[ "${IVE_RUN}" -eq 0 ]] || [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
+    if 
+    [[ "${IVE_RUN}" -eq 0 ]] \
+     || \
+    [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
   # keep sending notification while servers are being read quessed at 40 seconds #   
     then dots='••••••••••••••••••••••••••••••••••••••••••••••••••' # multibyte
-         if [[ ! -t 0 &&  ! -n "${SSH_TTY}" ]] #
+         if _is_not_tty #
        # running non-interactively #
          then #
               for i in {1..7} #
@@ -79,7 +82,7 @@ check_all_region_data() {
     echo -n "Getting the server list..."
 
   if [[ ${#all_region_data} -lt 1000 ]]; then
-         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         if _is_tty #
        # Running interactively #
          then #
     echo -e "${red}Could not get correct region data. To debug this, run:"
@@ -102,7 +105,7 @@ get_selected_region_data() {
   /opt/bin/jq --arg REGION_ID "$selectedRegion" -r \
   '.regions[] | select(.id==$REGION_ID)')"
   if [[ -z $regionData ]]; then
-         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         if _is_tty #
        # RUNNING INTERACTIVELY #
          then # 
     echo -e "${red}The REGION_ID $selectedRegion is not valid.${nc}
@@ -227,7 +230,7 @@ if [[ $selectedRegion == "none" ]]; then
     .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   fi
       # Running thru server list takes a long time in a post-modem world
-        if [[ -t 0 || -n "${SSH_TTY}" ]] #
+        if _is_tty #
       # Running interactively #
         then #
   echo -e Testing regions that respond \
@@ -240,14 +243,14 @@ if [[ $selectedRegion == "none" ]]; then
 
   if [[ -z $selectedRegion ]]; then
 # MAX_LATENCY is too low #
-        if [[ -t 0 || -n "${SSH_TTY}" ]] #
+        if _is_tty #
       # Running interactively #
-        then 
+        then #
     echo -e "${red}No region responded within ${MAX_LATENCY}s, consider using a higher timeout."
     echo "For example, to wait 1 second for each region, inject MAX_LATENCY=1 like this:"
     echo -e "$ MAX_LATENCY=1 ./get_region.sh${nc}"
         else #
-             _pia_notify "No region responded in ${MAX_LATENCY}s.\n\tSet a higher MAX_LATENCY." 15000
+             _pia_notify "No region responded in ${MAX_LATENCY}s.\n\tSet a higher MAX_LATENCY." 15000 #
         fi #
     exit 1
   else
@@ -275,7 +278,7 @@ bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
-         if [[ -t 0 || -n "${SSH_TTY}" ]] #
+         if _is_tty #
        # running interactively #
          then #
   echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}" #
@@ -316,7 +319,7 @@ fi
 
 # Connect with WireGuard and clear authentication token file and latencyList
 if [[ $VPN_PROTOCOL == "wireguard" ]]; then
-     if [[ -t 0 || -n "${SSH_TTY}" ]] #
+     if _is_tty #
    # running interactively #
      then #
   echo "The ./get_region.sh script got started with"

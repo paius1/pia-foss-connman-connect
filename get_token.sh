@@ -27,7 +27,11 @@
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 255 #
 
-    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
+    export PATH=/opt/bin:/opt/sbin:"${PATH}" #
+
+  # Gui Notifications #
+    [[ -z "${kodi_user}" ]] \
+       && source ./kodi_assets/functions #
 
 # This function allows you to check if the required tools have been installed.
 check_tool() {
@@ -79,7 +83,8 @@ if [[ -z $PIA_USER || -z $PIA_PASS ]]; then
   exit 1
 fi
 
-  # check for existing token they are good for 24 hours! #
+  # check for existing token #
+  # they are good for 24 hours! #
     if [[ -s /opt/etc/piavpn-manual/token ]] #
     then #
          # https://stackoverflow.com/users/2318662/tharrrk #
@@ -101,14 +106,13 @@ generateTokenResponse=$(curl -s -u "$PIA_USER:$PIA_PASS" \
   "https://www.privateinternetaccess.com/gtoken/generateToken")
 
 if [[ $(echo "$generateTokenResponse" | /opt/bin/jq -r '.status') != "OK" ]]; then #
-     if [[ -t 0 || -n "${SSH_TTY}" ]] #
+     if _is_tty #
      then #
   echo
   echo
   echo -e "${red}Could not authenticate with the login credentials provided!${nc}"
   echo
      else #
-          [ -z "${kodi_user}" ] && source ./kodi_assets/functions #
           _pia_notify "Could not authenticate " '15000' &
      fi #
   exit
@@ -120,7 +124,7 @@ token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token') #
 tokenExpiration=$(timeout_timestamp)
 tokenLocation=/opt/etc/piavpn-manual/token
 
-     if [[ -t 0 || -n "${SSH_TTY}" ]] #
+     if _is_tty #
    # Running interactively #
      then #
           echo -e "PIA_TOKEN=$token${nc}"
@@ -128,5 +132,5 @@ tokenLocation=/opt/etc/piavpn-manual/token
           echo "This token will expire in 24 hours, on $tokenExpiration." #
           echo #
      fi #
-          echo "$token" > "$tokenLocation" #
+          echo "$token" > "$tokenLocation" || exit 1 #
           echo "$tokenExpiration" >> "$tokenLocation" #

@@ -30,7 +30,7 @@
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" #
 
-    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
+    export PATH=/opt/bin:/opt/sbin:"${PATH}" #
 
   # where to store the port number for later usage #
     portfile='/tmp/port.dat' #
@@ -44,7 +44,7 @@
 #exec > >(tee -a $LOG) #2>&1
 
   # this can be run separately
-    [[ -t 0 || -n "${SSH_TTY}" ]] \
+    _is_tty \
        && export PRE_UP_RUN='cli' #
     export LOG="${LOG:=/tmp/pia-wireguard.log}" #
 

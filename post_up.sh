@@ -18,7 +18,7 @@
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
-    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
+    export PATH=/opt/bin:/opt/sbin:"${PATH}" #
 
 # DEBUGGING #
 # shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
@@ -30,7 +30,7 @@
 #_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
 #exec > >(tee -a $LOG) #2>&1
 
-    if [[ "${PRE_UP_RUN+y}" != 'true' ]]
+    if [[ "${PRE_UP_RUN}" != 'true' ]]
     then >&2 _logger "Finishing up ..."; fi
 
   # by moving out of connect_to...sh we lost $SERVICE and $REGION_NAME
@@ -40,7 +40,7 @@
     if connmanctl connect "${SERVICE}"
   # SUCCESS
     then
-         if [[ -t 0 || -n "${SSH_TTY}" ]]
+         if _is_tty
         # RUNNING INTERACTIVELY #
          then echo
               echo "    The WireGuard interface got created.
@@ -58,7 +58,7 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
          fi #
     else echo "CONNMAN service ${SERVICE} failed!"
   # FAILED
-         [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
+         _is_not_tty \
            && _pia_notify "    FAILED            "
          _logger "    FAILED            "
          exit 255 #

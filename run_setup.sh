@@ -37,76 +37,83 @@
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
-    export PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin #
+    export PATH=/opt/bin:/opt/sbin:"${PATH}" #
 
   # add kodi GUI.Notifications #
   #     _pia_notify 'message' 'display time' 'image file' #
   # and logging #
   #     _logger 'message' [ logfile ] #
+  # get file creation time 
+  # check interval now - then
+  # convert seconds to 'X hrs Y mins Z secs'
+  # check for empty/unset variables n.b. test unset passes VARIABLE NAME ONLY
+  # check is interactive or not
+  #
     [ -z "${kodi_user}" ] \
     && source ./kodi_assets/functions #
 
-# DEBUGGING # systemd logs to journal env LOG=/dev/null
-LOG="${LOG:-/tmp/pia-wireguard.log}"
-exec > >(tee -a $LOG) #2>&1
+# DEBUGGING # systemd logs to journal env LOG=/dev/null #
+#LOG="${LOG:-/tmp/pia-wireguard.log}" #
+#:> "${LOG}" #
+#exec > >(tee -a $LOG) #2>&1 #
+#echo "Starting $(pwd)/${BASH_SOURCE##*/}" | tee >(_logger) #
 
-  # How was this script called
-  # does pia-wireguard.service exist. Are we using it?
+  # How was this script called [systemd|favourites|interactively] #
+  # systemd: continue #
+  # favourites: pia-wireguard.service exist? #
+  #             YES: (re)start service #
+  #             NO: set logfile and continue #
+  # interactively: set PRE_UP_RUN to cli #
+  # 
     if #
-    [[ -z "${PRE_UP_RUN+y}" ]] \
+    _is_unset PRE_UP_RUN \
       && \
-    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] \
+    _is_not_tty \
       && \
     [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
-  # Not called by systemd, not running in a shell, and systemd service exists #
-    then systemd-cat -t pia-wireguard.favourites -p warning <<< "(Re)starting pia-wireguard.service from outside of systemd" #
-       # log this in pia-wireguard log #
+  # not called by systemd or interactively, and systemd service exists #
+    then systemd-cat -t pia-wireguard.favourites -p warning \
+                     <<< "(Re)starting pia-wireguard.service from outside of systemd" #
+       # log this to systemd journal and pia-wireguard log #
          LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' #
        # optional Gui notificaton #
          #_pia_notify 'Called outside of systemd service is '" $(systemctl is-active  pia-wireguard.service)"'' ; sleep 5 #
-         if systemctl --quiet is-active  pia-wireguard.service #
-       # pia-wireguard is running. (Re)start. #
-         then systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service is restarting" #
-              systemctl restart pia-wireguard.service & #
-         else systemd-cat -t pia-wireguard.favourites -p info <<< "pia-wireguard.service is starting" #
-       # pia-wireguard is not running. start. #
-              systemctl start pia-wireguard.service & #
-         fi #
-         exit 0 #
-    elif
-    [[ -z "${PRE_UP_RUN+y}" ]] \
-       && \
-    [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
-  # No systemd journal so set LOG #
-    then export LOG="${LOG:-/tmp/pia-wireguard.log}"
-         _logger "found no systemd service logging to ${LOG}"
-         _pia_notify "logging to ${LOG}"
-       # Force displaytime
-         sleep 5
-    elif [[ -z "${PRE_UP_RUN+y}" ]]
-  # Running in a shell "logs" to terminal
-    then export PRE_UP_RUN='cli'
-    fi #
 
-  # systemd checks for non empty .env file, so should we #
-  #     ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env & $PRE_UP_RUN #
-    if [[ -s .env ]] #
-  # read variables for .env file #
-    then 
-         source .env  #
-         _logger "Loaded .env file"
-    elif [[ -t 0 || -n "${SSH_TTY}" ]] #
-  # running interactively w/o a .env file #
-    then echo "Get ready to rumble" #
-    else _pia_notify "No valid PIA config -> $(pwd)/.env" 10000 #
-  # Fail without minimal .env file #
-         sleep 10
-         _pia_notify "CONNECTION FAILED" 100000 #
-         exit 1 #
+         case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
+       # is service active #
+         in #
+              0|true)  SRe='Res' #
+                       systemctl restart pia-wireguard.service & #
+                     ;; #
+              *|false) SRe='S' #
+                       systemctl start pia-wireguard.service & #
+             ;; #
+         esac #
+
+         systemd-cat -t pia-wireguard.favourites -p info <<< "${SRe}tarted pia-wireguard.service" #
+       # log this to systemd journal and pia-wireguard log #
+         LOG=/tmp/pia-wireguard.log _logger "${SRe}tarted pia-wireguard.service" #
+
+         exit 0 #
+
+    elif #
+    _is_unset PRE_UP_RUN \
+       && \
+    _is_not_tty #
+  # NO systemd, set LOG #
+    then export LOG="${LOG:-/tmp/pia-wireguard.log}" #
+         _logger "found no systemd service logging to ${LOG}" #
+         _pia_notify "logging to ${LOG}" #
+       # force displaytime #
+         sleep 5 #
+
+    elif _is_unset PRE_UP_RUN #
+  # run is interactive: set PRE_UP_RUN #
+    then export PRE_UP_RUN='cli' #
     fi #
 
   # possible variables for .env #
-    # required: when not running from a shell #
+    # REQUIRED: when not running from a shell #
       #   PIA_USER='pXXXXXXX' #
       #   PIA_PASS='p45sw0rdxx' #
       #
@@ -131,49 +138,72 @@ exec > >(tee -a $LOG) #2>&1
       #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4 #
       #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
 
-  # Check for changes in .env #
+  # systemd checks for non empty .env file, so should we #
+  #     ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env & $PRE_UP_RUN #
+    if [[ -s .env ]] #
+  # read variables from .env file #
+    then _logger "Load .env file"
+         source .env  #
+
+    elif _is_tty #
+  # run is interactive w/o a .env file #
+    then echo "Get ready to rumble" #
+
+    else _pia_notify "No valid PIA config -> $(pwd)/.env" 10000 #
+  # fail without minimal .env file #
+         sleep 10
+         _pia_notify "CONNECTION FAILED" 100000 #
+         exit 1 #
+    fi #
+
+  # changes in .env file? # NOTE to self when disconnecting touch pia.config to reset creation time
+  # If NO and pia.config is < 24hrs old, skip to ./post_up.sh #
     if #
-    [[ "${PRE_UP_RUN}" != 'cli' ]] \
+    _is_not_tty \
       && \
     [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
   # not running interactively, have checksum for previous .env #
     then _logger "    Checking current .env file with previous" #
+
          if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
        # .env is unchanged #
          then _logger "    .env is unchanged" #
-              age_env="$(_interval $(_created ~/.config/wireguard/pia.config))" #
-              if [[ "${age_env}" -lt $((24*60*60)) ]] #
+
+              age_pia_config="$(_interval "$(_created ~/.config/wireguard/pia.config)")" #
+              if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
             # wireguard/pia.config is less that 24 hours old   #
-              then _logger "    pia.config is $(_hmmss ${age_env}) old" #
-                 # call ./post_up.sh   #
+              then _logger "    pia.config is $(_hmmss "${age_pia_config}") old" #
+
+                 # exit for systemd ExecStartPost, or call ./post_up.sh & exit for favourites #
                    case "${PRE_UP_RUN}" in #
                         t*) exit 0 ;; #
                       # systemd calls ./post_up.sh  
                         *)  ./post_up.sh & exit 0 ;; #
                    esac
               fi #
+
          else  _logger "      .env file has changed, running thru setup" #
        # Save checksum for new file #
                sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          fi #
+
     elif ! [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
   # create /opt/etc/piavpn-manual/sha1sum.env #
     then sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
+
     else echo "Running interactively skipped checksum and .env check" #
   # running interactively #
     fi #
 
-  #     NON-INTERACTIVE VARIABLE CHECK               #
-    if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+  # NON-INTERACTIVE VARIABLE CHECK #
+    if _is_not_tty #
   # running non-interactive kit check" #
     then #
 
-       # display time in ms for important notifications _pia_notify '${BOTHER}' #
+       # display time in ms for IMPORTANT NOTIFICATIONS _pia_notify '${BOTHER}' #
        # kodi won't wait so you will have to sleep $((BOTHER/1000)). Hence it's a bother.
          export BOTHER=14000 #
-
-         function _is_empty() { [[ -z "${1}" ]]; } #
 
        # Check credentials #
          if #
@@ -187,9 +217,9 @@ exec > >(tee -a $LOG) #2>&1
               exit 1 #
          fi #
 
-       # PREFERRED_REGION|AUTOCONNECT will create a connman config #
+       # PREFERRED_REGION|AUTOCONNECT will create a connman config  with no interaction #
        # AUTOCONNECT|CONNMAN_CONNECT = false|null requires using Settings > CoreELEC > Connections #
-       #   and sets no firewall or port forwarding #
+       #   and sets NO FIREWALL or port forwarding #
          if #
          _is_empty "${PREFERRED_REGION}" \
           || 
@@ -213,8 +243,9 @@ exec > >(tee -a $LOG) #2>&1
                 if ! _is_empty "${PREFERRED_REGION}" #
               # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
                 then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
+                else 
               # PREFERRED_REGION not set #
-                else [[ "${AUTOCONNECT}" =~ ^f ]] \
+                     [[ "${AUTOCONNECT}" =~ ^f ]] \
                      && MAX_LATENCY="${MAX_LATENCY:=0.05}" #
                      via="the fastest server" #
                 fi #
@@ -225,8 +256,8 @@ exec > >(tee -a $LOG) #2>&1
 
        # BOTHER ABOUT PREFERRED_REGION='' BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
          _is_empty "${PREFERRED_REGION}" \
-          && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
-               sleep "$((BOTHER/1000))"; } #
+                   && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
+                        sleep "$((BOTHER/1000))"; } #
 
        # Set PIA_PF and PIA_DNS. Notify if forcing PIA_DNS #
          PIA_PF="${PIA_PF:-false}" #
@@ -240,14 +271,14 @@ exec > >(tee -a $LOG) #2>&1
          _pia_notify 'getting details for '"${via}"'' #
     fi #
 
-  # PRE_UP_RUN is set true by systemd, and 'cli' if -t 0 #
+  # PRE_UP_RUN is set true by systemd, and 'cli' if _is_tty #
   # if not set then call ./pre_up.sh
-    if [[ -z "${PRE_UP_RUN+y}" ]] #
+    if _is_unset PRE_UP_RUN #
   # No systemd service or not running interactively #
-    then :> "${LOG}" #
+    then #:> "${LOG}" #
          _logger "Setting up sane environment" #
          ./pre_up.sh #
-         fi #
+    fi #
 
 # end of major changes
 
@@ -388,7 +419,7 @@ if echo "${DISABLE_IPV6:0:1}" | grep -iq n; then
   echo -e "${red}IPv6 settings have not been altered.
   ${nc}"
 else
-     if [[ -t 0 || -n "${SSH_TTY}" ]] #
+     if _is_tty #
    # Running interactively #
      then #
   echo -e "The variable ${green}DISABLE_IPV6=$DISABLE_IPV6${nc}, does not start with 'n' for 'no'.
@@ -511,7 +542,7 @@ For example, you can try 0.2 for 200ms allowed latency.
 
       if [[ -s /opt/etc/piavpn-manual/latencyList ]]; then #
         # Output the ordered list of servers that meet the latency specification $MAX_LATENCY
-                if [[ -t 0 || -n "${SSH_TTY}" ]] #
+                if _is_tty #
               # RUNNING INTERACTIVELY #
                 then #
         echo -e "Ordered list of servers with latency less than ${green}${MAX_LATENCY}${nc} seconds:" #
@@ -563,7 +594,7 @@ For example, you can try 0.2 for 200ms allowed latency.
                      _pia_notify 'Selected for '"${REGION}"'' #
                 fi #
       else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
-           if [[ ! -t 0 && ! -n "${SSH_TTY}" ]] #
+           if _is_not_tty #
          # RUNNING NON-INTERACTIVELY #
            then #
                 _pia_notify "No Available Servers Found!" "${BOTHER}" #
@@ -636,7 +667,7 @@ ${nc}"
 # Check for the required presence of resolvconf for setting DNS on wireguard connections
 setDNS="yes"
 if ! command -v resolvconf &>/dev/null && [[ $VPN_PROTOCOL == "wireguard" ]]; then
-     if [[ -t 0 || -n "${SSH_TTY}" ]] #
+     if _is_tty #
    # Running interactively #
      then #
           echo -e "${red}The resolvconf package could not be found." #
