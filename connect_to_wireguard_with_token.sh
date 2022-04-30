@@ -100,13 +100,16 @@ fi
     [[ -t 0 || -n "${SSH_TTY}" ]] \
       && \
     [[ -s /opt/etc/wireguard/pia.conf ]] #
-  # Overwrite existing .conf running interactively #
+  # Overwrite existing pia.conf running interactively #
     then printf "Wireguard configuration exists, overwrite? ([Y]es/[n]o): " #
          read -r continue #
          if grep -iq n <<< "${continue:0:1}" #
-       # NO #
-         then exit 1 #
+       # NO, add '(user added)' #
+         then cli='(user added)' #
          fi #
+    elif ! [[ -t 0 || -n "${SSH_TTY}" ]] #
+  # not interactive make backup [ -v sends to log/journal ]
+    then cp -v /opt/etc/wireguard/pia.conf /opt/etc/wireguard/pia.conf~
     fi #
 
 # Create ephemeral wireguard keys, that we don't need to save to disk.
@@ -134,11 +137,12 @@ export wireguard_json
 # Check if the API returned OK and stop this script if it didn't.
 if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   >&2 echo -e "${red}Server did not return OK. Stopping now.${nc}"
+         _pia_notify "Server did not return OK. Stopping now."  '10000' 'pia_off_48x48.png' #
+       # added for NON_INTERACTIVE #
   exit 1
 fi
 
-    REGION_NAME="$(/opt/bin/jq -r '.name' /opt/etc/piavpn-manual/regionData )" #
-
+  # LibreElec doesn't include the iptables_raw kernel module #
   # CONNMAN sets up the interface ignoring wg-quick #
 # Create the WireGuard config based on the JSON received from the API
 # In case you want this section to also add the DNS setting, please
@@ -149,7 +153,8 @@ fi
 if [[ $PIA_DNS == "true" ]]; then
   dnsServer=$(echo "$wireguard_json" | /opt/bin/jq -r '.dns_servers[0]')
        if [[ -t 0 || -n "${SSH_TTY}" ]] #
-       then # RUNNING INTERACTIVELY #
+     # RUNNING INTERACTIVELY #
+       then #
   echo #
   echo "Set up DNS to $dnsServer. Since we do not have resolvconf," #
   echo "we will rely on connman to set nameservers" #
@@ -158,7 +163,7 @@ if [[ $PIA_DNS == "true" ]]; then
        fi #
   dnsSettingForVPN="DNS = ${dnsServer}" #
 fi
-echo -n "Trying to write /opt/etc/wireguard/pia.conf..." #
+echo -n "Trying to write /opt/etc/wireguard/pia${cli}.conf..." #
   # changed path #
     mkdir -p /opt/etc/wireguard #
 echo "
@@ -172,13 +177,19 @@ PersistentKeepalive = 25
 PublicKey = $(echo "$wireguard_json" | /opt/bin/jq -r '.server_key')
 AllowedIPs = 0.0.0.0/0
 Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | /opt/bin/jq -r '.server_port')
-" > /opt/etc/wireguard/pia.conf || exit 1 # changed path #
+" > /opt/etc/wireguard/pia"${cli}".conf || exit 1 # changed path #
 echo -e "${green}OK!${nc}"
     echo #
 
+# Notes
+# LibreElec doesn't include the iptables_raw kernel module so it's not possible to set AllowedIps as 0.0.0.0/0 #
   # Since I can't get wg-quick to work #
   # Convert wireguard .conf to a connman .config #
 
+  # read wireguard.conf into variables and export any needed by post_up.sh #
+    eval "$( grep -e '^[[:alpha:]]' /opt/etc/wireguard/pia"${cli}".conf | sed 's/ = /=/g')" #
+    export DNS #
+unset cli
 # Prevent overwriting a system generated file from shell. default adds '(user added)' to Name=
     if 
     [[ -t 0 || -n "${SSH_TTY}" ]] \
@@ -188,17 +199,18 @@ echo -e "${green}OK!${nc}"
     then printf "PIA Wireguard configuration exists, overwrite? ([N]o/[y]es): " #
          read -r continue #
          if grep -iq -v y <<< "${continue:0:1}" #
-       # NO #
+       # NO, add '(user added)' #
          then cli='(user added)' #
          fi #
+    elif ! [[ -t 0 || -n "${SSH_TTY}" ]] #
+  # not interactive make backup [ -v sends to log/journal ]
+    then cp -v /storage/.config/wireguard/pia.config /storage/.config/wireguard/pia.config~
     fi #
 
-  # read wireguard.conf into variables and export any needed by post_up.sh #
-    eval "$( grep -e '^[[:alpha:]]' /opt/etc/wireguard/pia.conf | sed 's/ = /=/g')" #
-    export DNS #
-
-  # Determine name of VPN used by CONNMAN #
-    SERVICE=$( sed 's/\./_/g' <<< "vpn_${Endpoint%:*}") #
+  # Determine names of VPN used by connmanctl #
+  # Save for use by scripts when not run in order line 398
+    REGION_NAME="$(/opt/bin/jq -r '.name' /opt/etc/piavpn-manual/regionData | tee /media/paul/coreelec/storage/.config/wireguard/connman.vars )" #
+    SERVICE=$( sed 's/\./_/g' <<< "vpn_${Endpoint%:*}" | tee -a /media/paul/coreelec/storage/.config/wireguard/connman.vars) #
     export SERVICE #
 
 # Are the endpoints the same
@@ -288,7 +300,7 @@ echo -e "${green}OK!${nc}"
   # Check for conflict between interactive run and systemd #
     if  #
     [[ -t 0 || -n "${SSH_TTY}" ]] \
-    && \
+      && \
     [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
   # Running interactively with systemd service #
     then SERVICE_STATE="$(systemctl is-active  pia-wireguard.service)" #
@@ -299,24 +311,30 @@ echo -e "${green}OK!${nc}"
 
               grep -iq -v y <<< "${continue:0:1}" \
                        && { echo "Goodbye"; exit 0; } #
-       # IF YES Send a message to systemd journal regarding this #
+       # YES, Send a message to systemd journal regarding this #
          systemd-cat -t pia-wireguard.cmdline -p warning <<< "Stopping pia-wireguard.service from the command line" #
        # Stop pia-wireguard service #
        # This runs ./shutdown.sh which should mirror ./pre_up.sh #
        # i.e disconnecting, iptables, DNS, port_forward.sh,stops apps #
          systemctl stop pia-wireguard.service #
          else echo "pia-wireguard service is ${SERVICE_STATE}" #
-       # pia-wireguard is inactive run previously skipped pre_up.sh
+       # NO, run previously skipped pre_up.sh
               ./pre_up.sh #
          fi #
     elif [[ -t 0 || -n "${SSH_TTY}" ]] #
-  # interactive w/o systemd service #
+  # interactive w/o systemd service  defered run of pre_up.sh #
     then export PRE_UP_RUN='cli' #
          ./pre_up.sh #
     fi #
 
   # Save for use by scripts when not run in order
     echo -e "SERVICE=\"${SERVICE}\"\n REGION_NAME=\"${REGION_NAME}\"" > /storage/.config/wireguard/connman.vars
+
+  # Moving port forwarding to post_up.sh loses all of these variables
+    echo " PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" | tee /opt/etc/piavpn-manual/port_forward.cmd #
+  # reusability
+    echo "WG_SERVER_IP=\"$PF_GATEWAY\"
+WG_HOSTNAME=\"$PF_HOSTNAME\"" | tee -a /opt/etc/piavpn-manual/port_forward.cmd #
 
   # if called outside of systemd, then run ./post_up.sh manually #
     if [[ "${PRE_UP_RUN}" != 'true' ]] #
