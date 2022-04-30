@@ -8,6 +8,7 @@
   #     _logger 'message' [ logfile ]
   # check for .env file changes
   # check for empty variables
+  # convert seconds to X hrs Y mins Z secs
 
   # credentials for local kodi
     kodi_user=kodi
