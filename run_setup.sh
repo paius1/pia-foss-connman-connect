@@ -160,6 +160,7 @@ exec > >(tee -a $LOG) #2>&1
   # create /opt/etc/piavpn-manual/sha1sum.env #
     then sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
+    else echo "Running interactively skipped checksum and .env check" #
   # running interactively #
     fi #
 
@@ -241,7 +242,7 @@ exec > >(tee -a $LOG) #2>&1
 
   # PRE_UP_RUN is set true by systemd, and 'cli' if -t 0 #
   # if not set then call ./pre_up.sh
-    if [ -z "${PRE_UP_RUN+y}" ] #
+    if [[ -z "${PRE_UP_RUN+y}" ]] #
   # No systemd service or not running interactively #
     then :> "${LOG}" #
          _logger "Setting up sane environment" #
