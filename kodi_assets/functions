@@ -6,9 +6,11 @@
   #     _pia_notify 'message' 'display time' 'image file'
   # logging function
   #     _logger 'message' [ logfile ]
-  # check for .env file changes
-  # check for empty variables
-  # convert seconds to X hrs Y mins Z secs
+  # get file creation time 
+  # check interval now and then
+  # convert seconds to 'X hrs Y mins Z secs'
+  # check for empty/unset variables
+  # run is interactive or not
 
   # credentials for local kodi
     kodi_user=kodi
@@ -36,15 +38,16 @@
         IFS="" spaces="$(printf "%$((tab*2))s")"
         TZ="$( awk -F, 'END {print $1}' < <(strings /etc/localtime))"
         date="$(TZ="${TZ}" /opt/bin/date)"
-        if [[ -z "${PRE_UP_RUN+y}" ]]
-      # Running non-interactively but not from systemd: print to stdout and $log
-        then
-             printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}"
+
+      # running non-interactively but not from systemd: print to stdout and $log
+        _is_unset PRE_UP_RUN \
+        && \
+        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message} ${source} ${tab}" $'\n'| tee -a "${log}" \
+        ||
+        echo "${message}"
+      # send message to stdout
            # cat to systemd journal
              #systemd-cat -t pia-wireguard -p warning <<< "${message}"
-        else echo "${message}"
-      # send message to stdout
-        fi
     }
   export -f _logger
 
@@ -81,8 +84,8 @@
         image="${3:-"pia_on_48x48.png"}"
       # assume ./kodi_assets, and all scripts set working directory
         image_path="$(pwd)/kodi_assets"
-      [[ -s "${image_path}/${image}" ]] \
-         && show_image=',"image":"'"${image_path}/${image}"'"'
+        [[ -s "${image_path}/${image}" ]] \
+           && show_image=',"image":"'"${image_path}/${image}"'"'
 
         status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${show_image}"' }, "id": 1} '))"
 
@@ -113,12 +116,7 @@
  }
     export -f _interval
 
-  # check variable empty of unset
-    function _is_empty() {
-        [[ -z "${1}" ]]
- } #
-    export -f _is_empty
-
+  # convert seconds to X hrs Y mins Z secs
     function _hmmss() {
         local time="$1"
         local h m s
@@ -126,4 +124,29 @@
         printf "%d hrs %02d mins %02d secs" "${h#-}" "${m#-}" "${s#-}"
  }
     export -f _hmmss
+
+  # check variable unset
+    function _is_unset() {
+        local VarName=$1
+        [[ -z ${!VarName+y} ]]
+ }
+    export -f _is_unset
+
+  # check variable empty
+    function _is_empty() {
+        [[ -z "${1}" ]]
+ } #
+    export -f _is_empty
+
+  # running interactively
+    function _is_tty() {
+        [[ -t 0 || -n "${SSH_TTY}" ]]
+ }
+    export -f _is_tty
+
+  # not running interactively
+    function _is_not_tty() {
+        ! [[ -t 0 || -n "${SSH_TTY}" ]]
+ }
+    export -f _is_not_tty
 
