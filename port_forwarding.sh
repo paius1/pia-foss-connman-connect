@@ -255,7 +255,7 @@ while true; do
          _logger "Expires at        $(date --date="$expires_at")" #
          _logger "${BASH_SOURCE##*/} must remain active to use port forwarding," #
          _logger "and will refresh every 15 minutes." #
-    else _logger "Rebinding to peer port ${port}" #
+    else _logger "Rebinding to peer port ${port} @ $(date +'%I:%M:%S %D')" #
     fi #
 
     # sleep 15 minutes
