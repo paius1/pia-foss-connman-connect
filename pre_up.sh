@@ -32,13 +32,14 @@ export LOG="${LOG:-/tmp/pia-wireguard.log}"
 _logger "Starting $(pwd)/${BASH_SOURCE##*/}"
 
   # CHECK FOR SYSTEM STARTUP
-    if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]]
+    up="$(</proc/uptime)"
+    if [[ "${up%%.*}" -lt 60 ]]
   # System has just started wait, save a copy of /run/connman/resolv.conf and the routing table
     then _logger "System Startup waiting..."
          sleep 1
        # Assume the nameservers at startup are good
-         cp -v /run/connman/resolv.conf /storage/.cache/starting_resolv.conf \
-          |& tee >(_logger)
+         cp -v /run/connman/resolv.conf /storage/.cache/starting_resolv.conf |
+         tee >(_logger)
        # Same for the routing table
          ip route save table all > /storage/.config/ip_route_clean.bin
          _logger "backed up routing table to /storage/.config/ip_route_clean.bin"
@@ -51,18 +52,23 @@ _logger "Starting $(pwd)/${BASH_SOURCE##*/}"
     fi
 
   # Stop any vpn's connections
-  # First service is connected service, is it a vpn?
+
+  # 1st connected service, is it a vpn?
     wg_0="$(connmanctl services | awk 'NR == 1 && /vpn_/ {print $NF}')"
 
     if [[ -n "${wg_0}" ]]
   # Vpn active
     then _logger "$(connmanctl disconnect "${wg_0}")"
+
+         wg_0_file="$(grep -l --exclude='~$' "${wg_0##*_}" ~/.config/wireguard/*.config)"
+         REGION="$(awk -F[][] '/Name =/{print $2}'  "${wg_0_file}")"
+
        # GUI Notification
          _is_not_tty \
-           && _pia_notify 'Disconnected from '"${REGION}"' ' 7000 "pia_off_48x48.png"
+           && _pia_notify 'Disconnected from '"${REGION}"' ' 5000 "pia_off_48x48.png"
 
        # reset pia.config age
-         touch ~/.config/wireguard/pia.conf
+         touch "${wg_0_file}"
 
     else _logger "No current vpn connection"
   # NO
@@ -84,7 +90,7 @@ _logger "Starting $(pwd)/${BASH_SOURCE##*/}"
          if [ -f /storage/.cache/starting_resolv.conf ]
        # There's a copy of /etc/resov.conf saved at system start by pre_up.sh
          then cp -v /storage/.cache/starting_resolv.conf /run/connman/resolv.conf \
-               |& tee >(_logger)
+               | tee >(_logger)
 
          else _logger "no preexisting resolv.conf winging it"
        # or create a new resolv.conf from connman settings
@@ -117,13 +123,16 @@ EOF
     done
     _logger "Have full network access"
 
-  # Port Forwarding cleanup
+  # port forwarding cleanup
     pf_pids=($(pidof port_forwarding.sh))
+
     if [ "${#pf_pids[@]}" -ne 0 ]
-  # stop portforwarding 
-    then _logger "Stopping port forwarding"
-         echo "${pf_pids[@]}" \
-            | xargs kill -9 >/dev/null 2>&1
+  # stop port forwarding 
+    then echo "${pf_pids[@]}" |
+         xargs -d $'\n' sh -c 'for pid do kill $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
+         _logger "Stopped port forwarding"
+       # clear the log file ?
+         :> /tmp/port_forward.log
     fi
 
 ################ Add other applications to stop below #################
