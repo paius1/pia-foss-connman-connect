@@ -43,19 +43,19 @@
     [[ "${IVE_RUN}" -eq 0 ]] \
      || \
     [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
-  # keep sending notification while servers are being read quessed at 40 seconds #   
     then dots='••••••••••••••••••••••••••••••••••••••••••••••••••' # multibyte
+  # keep sending notification while servers are being read quessed at 40 seconds #   
          if _is_not_tty #
-       # running non-interactively #
          then #
+       # running non-interactively #
               for i in {1..7} #
               do _pia_notify 'Testing for fastest Servers '"${dots:0:$((i*3))}"'' #
                  sleep 4.9 #
               done&
               disown #
          elif [[ "${PRE_UP_RUN}" = 'cli' ]] #
-       # running interactively from ./run_startup.sh #
          then #
+       # running interactively from ./run_startup.sh #
                    for i in {1..33}; do echo -ne "\rTesting for fastest Servers ${dots:0:$((i*3))}"; sleep 1; done& disown #
          fi #
     fi #
@@ -161,13 +161,13 @@ printServerLatency() {
   serverIP=$1
   regionID=$2
 
-        # increased --connect-timeout by 1 to get any no 0 replies #
-          local connect_timeout=$(echo "${MAX_LATENCY} 1}" | awk '{print $1 + $2}') #
+            # increased --connect-timeout by 1 to get any no 0 replies #
+              local connect_timeout=$(echo "${MAX_LATENCY} 1}" | awk '{print $1 + $2}') #
 
   regionName="$(echo "${@:3}" |
     sed 's/ false//' | sed 's/true/(geo)/')"
-  # get actual REGION name for "PREFERRED_REGION #
-        REGION="$(awk '{print $2}' <<< "${@:1}")" #
+            # get actual REGION name for "PREFERRED_REGION #
+              REGION="$(awk '{print $2}' <<< "${@:1}")" #
 
   time=$(LC_NUMERIC=en_US.utf8 curl -o /dev/null -s \
     --connect-timeout "$connect_timeout" \
@@ -176,15 +176,15 @@ printServerLatency() {
   if [[ $? -eq 0 ]]; then # successful connection #
 
             # compare time <= MAX_LATENCY  and add to list #
-            if awk "BEGIN {exit !($MAX_LATENCY >= $time)}" #
-            then #
+              if awk "BEGIN {exit !($MAX_LATENCY >= $time)}" #
+              then #
+            # fast enough #
 
     echo "$time $regionID $serverIP"
     # Write a list of servers with acceptable latency
-    # to /opt/etc/piavpn-manual/latencyList #
+        # to /opt/etc/piavpn-manual/latencyList changed path #
     echo -e "$time" "$regionID"'\t'"$serverIP"'\t'"$regionName" >> /opt/etc/piavpn-manual/latencyList #
-
-            fi #
+  fi
 
   fi
   # Sort the latencyList, ordered by latency
@@ -229,13 +229,13 @@ if [[ $selectedRegion == "none" ]]; then
     /opt/bin/jq -r '.regions[] |
     .servers.meta[0].ip+" "+.id+" "+.name+" "+(.geo|tostring)' )"
   fi
-      # Running thru server list takes a long time in a post-modem world
-        if _is_tty #
-      # Running interactively #
-        then #
+            # Running thru server list takes a long time in a post-modem world
+              if _is_tty #
+              then #
+            # Running interactively #
   echo -e Testing regions that respond \
     faster than "${green}$MAX_LATENCY${nc}" seconds:
-        fi #
+              fi #
   selectedRegion="$(echo "$summarized_region_data" |
     xargs -I{} bash -c 'printServerLatency {}' |
     sort | head -1 | awk '{ print $2 }')"
@@ -243,15 +243,15 @@ if [[ $selectedRegion == "none" ]]; then
 
   if [[ -z $selectedRegion ]]; then
 # MAX_LATENCY is too low #
-        if _is_tty #
-      # Running interactively #
-        then #
+              if _is_tty #
+              then #
+            # Running interactively #
     echo -e "${red}No region responded within ${MAX_LATENCY}s, consider using a higher timeout."
     echo "For example, to wait 1 second for each region, inject MAX_LATENCY=1 like this:"
     echo -e "$ MAX_LATENCY=1 ./get_region.sh${nc}"
-        else #
-             _pia_notify "No region responded in ${MAX_LATENCY}s.\n\tSet a higher MAX_LATENCY." 15000 #
-        fi #
+              else #
+                   _pia_notify "No region responded in ${MAX_LATENCY}s.\n\tSet a higher MAX_LATENCY." 15000 'pia_off_48x48.png' #
+              fi #
     exit 1
   else
     echo -e "A list of servers and connection details, ordered by latency can be
@@ -278,9 +278,9 @@ bestServer_OU_hostname=$(echo "$regionData" | /opt/bin/jq -r '.servers.ovpnudp[0
 
 
 if [[ $VPN_PROTOCOL == "no" ]]; then
-         if _is_tty #
-       # running interactively #
-         then #
+              if _is_tty #
+              then #
+            # running interactively #
   echo -ne "The $selectedOrLowestLatency region is ${green}$(echo "$regionData" | /opt/bin/jq -r '.name')${nc}" #
   if echo "$regionData" | /opt/bin/jq -r '.geo' | grep true > /dev/null; then #
     echo " (geolocated region)."
@@ -295,7 +295,7 @@ and port forwarding = ${PIA_PF}:
 ${green}WireGuard     $bestServer_WG_IP\t-     $bestServer_WG_hostname
    PREFERRED_REGION='${bestServer_region}'
 " #
-          fi #
+              fi #
 fi
 
 # The script will check for an authentication token, and use it if present
@@ -319,9 +319,9 @@ fi
 
 # Connect with WireGuard and clear authentication token file and latencyList
 if [[ $VPN_PROTOCOL == "wireguard" ]]; then
-     if _is_tty #
-   # running interactively #
-     then #
+              if _is_tty #
+              then #
+            # running interactively #
   echo "The ./get_region.sh script got started with"
   echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
         echo -e "\tPREFERRED_REGION=\"$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList )\"" #
@@ -330,7 +330,7 @@ if [[ $VPN_PROTOCOL == "wireguard" ]]; then
   echo "\tWG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\" #
   echo -e "\tPIA_PF=$PIA_PF ./connect_to_wireguard_with_token.sh${nc}" #
   echo
-     fi #
+              fi #
   PIA_PF=$PIA_PF PIA_TOKEN=$PIA_TOKEN WG_SERVER_IP=$bestServer_WG_IP \
   WG_HOSTNAME=$bestServer_WG_hostname ./connect_to_wireguard_with_token.sh
     # keep this file to get PREFERRED_REGION later #

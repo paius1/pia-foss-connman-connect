@@ -121,11 +121,11 @@ export wireguard_json
 # Check if the API returned OK and stop this script if it didn't.
 if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   >&2 echo -e "${red}Server did not return OK. Stopping now.${nc}"
-         _pia_notify "Server did not return OK. Stopping now."  '10000' 'pia_off_48x48.png' #
-       # added for non-interactive #
+            _pia_notify "Server did not return OK. Stopping now."  '10000' 'pia_off_48x48.png' #
+          # added for non-interactive #
   exit 1
 fi
-    echo "${wireguard_json}" > /opt/etc/piavpn-manual/wireguard_json-"${WG_HOSTMANE}" #
+            echo "${wireguard_json}" > /opt/etc/piavpn-manual/wireguard_json-"${WG_HOSTMANE}" #
 
 # Create the WireGuard config based on the JSON received from the API
 # In case you want this section to also add the DNS setting, please
@@ -135,20 +135,20 @@ fi
 # require it.
 if [[ $PIA_DNS == "true" ]]; then
   dnsServer=$(echo "$wireguard_json" | /opt/bin/jq -r '.dns_servers[0]')
-       if _is_tty #
-     # running interactively #
-       then #
+            if _is_tty #
+            then #
+          # running interactively #
   echo #
   echo "Set up DNS to $dnsServer. Since we do not have resolvconf," #
   echo "we will rely on connman to set nameservers" #
   echo "and ensure ${dnsServer} is the first one" #
   echo
-       fi #
+            fi #
   dnsSettingForVPN="DNS = ${dnsServer}" #
 fi
 echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
-  # changed path #
-    mkdir -p /opt/etc/wireguard #
+          # changed path #
+            mkdir -p /opt/etc/wireguard #
 
   # Verify overwriting system generated file from shell #
   # appended  '-cli'? #
@@ -159,13 +159,9 @@ echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
   # overwrite existing pia.conf running interactively #
          read -r continue #
          if grep -iq n <<< "${continue:0:1}" #
-       # NO, add '-cli' to file name #
          then plus='-cli' #
+       # NO, add '-cli' to file name #
          fi #
-#elif _is_not_tty #
-# not interactive make backup [ -v sends to log/journal ] #
-#then cp -v /opt/etc/wireguard/pia.conf /opt/etc/wireguard/pia.conf~ |
-#tee >(_logger) #
     fi #
 
 echo "
@@ -182,6 +178,7 @@ Endpoint = ${WG_SERVER_IP}:$(echo "$wireguard_json" | /opt/bin/jq -r '.server_po
 " > /opt/etc/wireguard/pia"${plus}".conf || exit 1 # changed path and name #
 echo -e "${green}OK!${nc}"
     echo #
+
     cp /opt/etc/wireguard/pia"${plus}".conf /opt/etc/wireguard/pia"${plus}-${WG_HOSTNAME}".conf #
 
   # LibreElec doesn't include the iptables_raw kernel module #
@@ -201,14 +198,14 @@ echo -e "${green}OK!${nc}"
     if _is_tty \
          &&
        [[ -s /storage/.config/wireguard/pia.config ]] #
-  # overwrite existing pia.config running interactively? #
     then printf "PIA Wireguard configuration exists, overwrite? ([N]o/[y]es): " #
+  # overwrite existing pia.config running interactively? #
          read -r continue #
          if grep -iq -v y <<< "${continue:0:1}" #
-       # NO, add '-(user added)' #
          then cli='-(user_added)' #
+       # NO, add '-(user added)' #
               export cli #
-            # exported to post_up.sh #
+            # export for post_up.sh #
          fi #
     fi #
 
@@ -250,24 +247,26 @@ echo -e "${green}OK!${nc}"
     if [[ "${CONNMAN_CONNECT}" = "true" ]] \
          ||
        [[ "${AUTOCONNECT}" = "true" ]] #
-  # Skip to connmanctl connect vpn_XXX_XXX_XXX_XXX_Domain #
     then echo "CONNMAN service ${SERVICE}! is ready" |
+  # Skip to ./post_up.sh #
          tee -i >(_logger ) # >(_pia_notify ) >/dev/null #
          #sleep 1 #
 
     else #
   # Connection Dialog/Monologue #
          if _is_tty #
-       # running interactively
          then echo -e "\nCONNMAN service ${SERVICE}! is ready" #
+       # running interactively
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
               echo #
               if echo "${connect:0:1}" |
                  grep -iq n #
               then _print_connection_instructions #
+            # don't connect
                    exit 0 #
               else echo -e "User wishes to proceed with connection\n" #
+            # connect
                    export CONNMAN_CONNECT=true # proceed with connection
               fi #
          else _print_connection_instructions #
@@ -283,56 +282,62 @@ echo -e "${green}OK!${nc}"
     if _is_tty \
          &&
        [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
-  # Running interactively with systemd service #
     then #
+  # run interactive with systemd service #
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
-       # is service active #
          in #
-              0|true)  printf "PIA Wireguard running as a service, continue? ([N]o/[y]es): " #
-                       read -r continue #
-                       if grep -iq -v y <<< "${continue:0:1}" #
-                     # NO #
-                       then echo "Goodbye" #
-                            _print_connection_instructions #
-                            exit 0 #
-                       else 
-                     # YES #
-                            systemd-cat -t pia-wireguard.cmdline -p warning \
-                                       <<< "Stopping pia-wireguard.service from the command line" #
-                          # Stop pia-wireguard service #
-                            systemctl stop pia-wireguard.service #
-                          # This runs ./shutdown.sh which should mirror ./pre_up.sh #
-                          # i.e disconnecting, iptables, DNS, port_forward.sh,stops apps #
-                       fi # 
-                     ;; #
-              *|false) echo "pia-wireguard service is not running" #
-                       export PRE_UP_RUN='cli' #
-                       ./pre_up.sh #
+          # systemd service active #
+            0|true)  printf "pia-wireguard service is running, continue? ([N]o/[y]es): " #
+                   # stop? #
+                     read -r continue #
+                     if grep -iq -v y <<< "${continue:0:1}" #
+                   # NO #
+                     then echo "Goodbye" #
+                          _print_connection_instructions #
+                          exit 0 #
+                     else # 
+                   # YES #
+                        # log this to systemd journal #
+                          systemd-cat -t pia-wireguard.cmdline -p warning \
+                                     <<< "Stopping pia-wireguard.service from the command line" #
+                          systemctl stop pia-wireguard.service #
+                        # stop pia-wireguard service #
+                        # This runs ./shutdown.sh which should mirror ./pre_up.sh #
+                        # i.e disconnecting, iptables, DNS, port_forward.sh,stops apps #
+                     fi # 
+                   ;; #
+            *|false) echo "pia-wireguard service is not running" #
+          # sally forth #
+                     export PRE_UP_RUN='cli' #
+                     ./pre_up.sh #
              ;; #
          esac #
 
     elif _is_tty #
-  # interactive w/o systemd service defered run of pre_up.sh #
     then export PRE_UP_RUN='cli' #
+  # interactive w/o systemd service defered run of pre_up.sh #
          ./pre_up.sh #
     fi #
 
-  # Moving port forwarding to post_up.sh loses all of these variables
+  # Moving port forwarding to post_up.sh loses all of these variables #
+  # save the command to a file, and eval post_up #
     echo " PIA_PF=${PIA_PF} PIA_TOKEN=${PIA_TOKEN} \\
  PF_GATEWAY=${WG_SERVER_IP} PF_HOSTNAME=${WG_HOSTNAME} \\
  $(pwd)/port_forwarding.sh" |
     tee -i /opt/etc/piavpn-manual/port_forward"${cli}".cmd #
+    echo -e "WG_SERVER_IP=\"${WG_SERVER_IP}\"\nWG_HOSTNAME=\"${WG_HOSTNAME}\"" |
+    tee -ia /opt/etc/piavpn-manual/port_forward"${cli}".cmd #
 
     if [[ "${PRE_UP_RUN}" != 'true' ]] #
-  # called outside of systemd, run ./post_up.sh manually #
-  # have exported PRE_UP_RUN and CONNMAN_CONNECT cli=-(user_added)|NULL
     then echo -e "Not called by systemd" #
+  # called outside of systemd, run ./post_up.sh manually #
+  # have exported PRE_UP_RUN and CONNMAN_CONNECT cli=-(user_added)|NULL #
          echo -e "calling $(pwd)/post_up.sh\n" #
          ./post_up.sh > /dev/null & #
     fi #
 
 #############################################
- exit 0                                     #
+    exit 0                                  #
 #############################################
 # USING CONNMANCTL instead
 ## Start the WireGuard interface.

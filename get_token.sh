@@ -87,6 +87,7 @@ fi
   # they are good for 24 hours! #
     if [[ -s /opt/etc/piavpn-manual/token ]] #
     then #
+  # existing tokenFile #
          # https://stackoverflow.com/users/2318662/tharrrk #
          m2n() { printf '%02d' $((-10+$(sed 's/./\U&/g;y/ABCEGLNOPRTUVY/60AC765A77ABB9/;s/./+0x&/g'<<<${1#?}) ));} #
 
@@ -95,9 +96,11 @@ fi
          expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenExpiration}"))" #
          if (( $(date -d "+30 min" +%s) < $(date -d "${expiry_iso}" +%s) )) #
          then echo "Previous token OK!" #
+       # less than 24hrs old #
               exit 0 #
          fi #
-    else echo "token expired retrieving a new one"
+    else echo "token expired retrieving a new one" #
+  # day old, refresh
     fi #
 
 echo -n "Checking login credentials..."
@@ -113,9 +116,9 @@ if [[ $(echo "$generateTokenResponse" | /opt/bin/jq -r '.status') != "OK" ]]; th
   echo -e "${red}Could not authenticate with the login credentials provided!${nc}"
   echo
      else #
-          _pia_notify "Could not authenticate " '15000' &
+          _pia_notify "Could not authenticate " '15000' & #
      fi #
-  exit
+  exit 255 #
 fi
 
 echo -e "${green}OK!"
@@ -124,13 +127,13 @@ token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token') #
 tokenExpiration=$(timeout_timestamp)
 tokenLocation=/opt/etc/piavpn-manual/token
 
-     if _is_tty #
+     #if _is_tty #
    # Running interactively #
-     then #
+     #then #
           echo -e "PIA_TOKEN=$token${nc}"
           echo #
           echo "This token will expire in 24 hours, on $tokenExpiration." #
           echo #
-     fi #
+     #fi #
           echo "$token" > "$tokenLocation" || exit 1 #
           echo "$tokenExpiration" >> "$tokenLocation" #

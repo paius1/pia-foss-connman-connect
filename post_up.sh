@@ -28,15 +28,16 @@
 #_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
 #exec > >(tee -a $LOG) #2>&1
 
-  # need AUTOCONNECT
-    eval "$(awk '/AUTOCONNECT/ && !/^[:blank:]*#/{print $0}' .env 2>/dev/null)"
+  # need AUTOCONNECT and WG_FIREWALL
+    eval "$(awk '/AUTOCONNECT=|WG_FIREWALL=/ && !/^[:blank:]*#/{print $0}' .env 2>/dev/null)"
 
   # post_up.sh is kind of a misnomer
     if [[ ! "${CONNMAN_CONNECT}" =~ ^[t|T] ]] \
          &&
        [[ "${AUTOCONNECT:-false}" =~ ^[f|F] ]] #
+    then 
   # both systemd and the user don't want to connect
-    then echo 'AUTOCONNECT='"${AUTOCONNECT}"' CONNMAN_CONNECT='"${CONNMAN_CONNECT}"'' |
+         echo 'AUTOCONNECT='"${AUTOCONNECT}"' CONNMAN_CONNECT='"${CONNMAN_CONNECT}"'' |
          tee >( _logger ) >( _is_not_tty && _pia_notify 6000 'pia_off_48x48.png' ) >/dev/null
            sleep 6
          _print_connection_instructions
@@ -50,17 +51,18 @@
   # _is_tty then cli might be set (exported by connect_to_w....sh)
     cli="${cli:-}"
   # from ~/.config/wireguard/pia${cli}.config #
-    eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia${cli}.config |  sed 's/\./_/g;s/ = \(.*\)$/="\1"/g')" #
+    eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia${cli}.config |
+            sed 's/\./_/g;s/ = \(.*\)$/="\1"/g')" #
     REGION_NAME="$( awk -F[][] '{print $2}' <<< "${Name}")"
     SERVICE="vpn_$(sed 's/\./_/g' <<< "${Host}")_${Domain}"
 
   # Connect with connmanctl
     if connmanctl connect "${SERVICE}"
-  # SUCCESS
     then
+  # SUCCESS
          if _is_tty
-       # running interactively #
          then echo
+       # running interactively #
               echo "    The WireGuard interface was created."
               echo "    At this point, internet should work via WIREGUARD VPN."
               echo 
@@ -82,29 +84,30 @@
     fi
 
     if [[ "${PIA_DNS:-true}" == "true" ]]
-  # Check and reset nameservers set by connmanctl #
     then
-         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${DNS:-10.0.0.243}" ]] #
-       # connman subordinates vpn dns to any preset nameservers #
-         then _logger "Replacing Connman's DNS with PIA's DNS" #
+  # Check and reset nameservers set by connmanctl
+         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${DNS:-10.0.0.243}" ]]
+         then _logger "Replacing Connman's DNS with PIA's DNS"
+       # connman subordinates vpn dns to any preset nameservers
             # replace headers and first nameserver with $DNS to temporary file
               sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS:-10.0.0.243}/}" \
-                     /run/connman/resolv.conf #
-              echo #
-         fi #
+                  /run/connman/resolv.conf
+              echo
+         fi
        # https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
          #DNS_SERVER="$(./dnsleaktest.py | awk -F"by" ' /by/{print $2; exit}')"
          #_pia_notify 'DNS server is '"${DNS_SERVER}"' ' 10000; sleep 9
     fi #
 
   # moved from connect_to_wireguard.sh thus losing all the variables
-    eval "$(awk -F'/' '{print $1}' /opt/etc/piavpn-manual/port_forward.cmd )"
+    eval "$(awk -F'/' '{print $1}' /opt/etc/piavpn-manual/port_forward"${cli}".cmd )"
 
   # This section did exit the script if PIA_PF is not set to "true".
   # the command for port forwarding will be sent to /tmp/port_forward.log
     if [[ $PIA_PF != "true" ]]
+    then
   # print instructions for starting port forwarding later
-    then echo -e "    To enable port forwarding run\n"
+         echo -e "    To enable port forwarding run\n"
          echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" #| tee /tmp/port_forward.log
          echo
          echo -e "    The location used must be port forwarding enabled, or this will fail."
@@ -113,20 +116,18 @@
          echo -e "    port_forwading.sh must be left running to maintain the port"
          echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background"
          echo
-         #exit 0
     else
   # Start port_forward.sh
-         echo "          logging port_forwarding.sh to /tmp/port_forward.log" #
+         echo "        logging port_forwarding.sh to /tmp/port_forward.log" #
 
        # allow rest of post_up.sh to run
          (sleep 2
-          chmod +x /opt/etc/piavpn-manual/port_forward.cmd
+          chmod +x /opt/etc/piavpn-manual/port_forward"${cli}".cmd
           eval /opt/etc/piavpn-manual/port_forward"${cli}".cmd > /tmp/port_forward.log
          )&
          disown
     fi #
 
-  # Iptables-restore vpn killswitch #
 #########################################################
 # Note to self:                                         #
 # Check /storage/.config/autostart.sh for any conflicts #
@@ -148,10 +149,10 @@
             && _logger "ip_tables module loaded"
     fi
 
+  # Iptables-restore vpn killswitch #
     echo "Setting up firewall"
-#    eval "$(awk '/WG_FIREWALL/ && !/^[:blank:]*#/{print $0}' .env 2>/dev/null)"
     iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}"
 
-  # Add any applications to start after this
+  # add any applications to start after this
 
 exit 0

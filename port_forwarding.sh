@@ -95,22 +95,31 @@ fi
   # An error with no recovery logic occured #
     fatal_error () { #
         local port="${1}" #
-        _logger "Fatal error" #
-      # remove port from iptables
+        echo "Fatal error::port_forwarding.sh" |
+        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png' #
+         sleep 10 #
+
+      # remove port from iptables #
         iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
-        _logger -n "Attempting Restarting port forwarding" #
-        sleep 15
+
+        echo "Attempting restart of port forwarding" |
+        tee >(_logger) >(_pia_notify 5000 'pia_off_48x48.png' #
+        sleep 15 #
     
         PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$PF_GATEWAY PF_HOSTNAME=$PF_HOSTNAME \
-        ./port_forwarding.sh > /tmp/port_forward.log &
+        ./port_forwarding.sh > /tmp/port_forward.log & disown #
         exit 1 #
  } #
 
   # Handle shutdown behavior
     finish () { #
-        _logger "Port forward rebinding stopped. The port will likely close soon." #
+        echo "Port forward rebinding stopped. The port will likely close soon." |
+        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png' #
+        #_logger "Port forward rebinding stopped. The port will likely close soon." #
+
       # remove port from iptables #
         iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
+
         exit 0 #
  }
     trap finish SIGTERM SIGINT SIGQUIT #
@@ -120,16 +129,16 @@ fi
     mypid=$$ #
 
     if [ "${#pids[@]}" -gt 1 ] #
+    then _logger "port_forwarding.sh is already running, will stop others" #
   # remove this instance from pids[@] #
-    then #
-         _logger "port_forwarding.sh is already running, will stop other" #
+         
          for i in "${!pids[@]}" #
          do if [ "${pids[$i]}" == "$mypid" ] #
             then unset pids[$i] #
             fi #
          done #
          echo "${pf_pids[@]}" |
-         xargs -d $'\n' sh -c 'for pid do kill $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
+         xargs -d $'\n' sh -c 'for pid do kill $pid 2>/dev/null; wait $pid 2>/dev/null; done' _ #
     fi #
 
   # wait for privateinternetaccess this could be an infinite loop #
@@ -179,7 +188,7 @@ if [[ -z $PAYLOAD_AND_SIGNATURE ]]; then
     #"https://${PF_HOSTNAME}:19999/getSignature")"
 
         # MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh #
-            payload_and_signature="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "token=${PIA_TOKEN}" --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/getSignature")"  #
+            payload_and_signature="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "token=${PIA_TOKEN}" --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/getSignature")" #
 else
   payload_and_signature=$PAYLOAD_AND_SIGNATURE
   echo -n "Checking the payload_and_signature from the env var... "
@@ -211,13 +220,14 @@ expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
 
     if [[ "${port}" =~ ^[0-9]+$ ]] #
     then #
-          # Dump port to file if requested #
-          [ -n "$portfile" ] && { echo "${port}" > "$portfile" && \
-                                  _logger "Port dumped to $portfile"; } #
+  # Dump port to file if requested #
+         [[ -n "$portfile" ]] \
+           && { echo "${port}" > "$portfile" \
+                && _logger "Port dumped to $portfile"; } #
 
-        # add port to iptables #
-          _logger "adding peer port ${port} to firewall" #
-          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT #
+       # add port to iptables #
+         iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT #
+         _logger "added peer port ${port} to firewall" #
 
 >&2 echo -ne "
 --> The port is ${green}$port${nc} and it will expire on ${red}$expires_at${nc}. <--
@@ -236,14 +246,14 @@ while true; do
     #--data-urlencode "signature=${signature}" \
     #"https://${PF_HOSTNAME}:19999/bindPort")"
 
-        # MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh
-                bind_port_response="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "payload=${payload}" --data-urlencode "signature=${signature}"  --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/bindPort" )"
+        # MODIFIED from https://github.com/triffid/pia-wg/blob/master/pia-portforward.sh #
+                bind_port_response="$( curl --interface wg0 --CAcert "ca.rsa.4096.crt" --get --silent --show-error --retry 5 --retry-delay 1 --max-time 2 --data-urlencode "payload=${payload}" --data-urlencode "signature=${signature}"  --resolve "$PF_HOSTNAME:19999:$PF_GATEWAY" "https://$PF_HOSTNAME:19999/bindPort" )" #
 
     # If port did not bind, just exit the script.
     # This script will exit in 2 months, since the port will expire.
     if [[ $(echo "$bind_port_response" | jq -r '.status') != "OK" ]]; then
       echo -e "${red}The API did not return OK when trying to bind port... Exiting.${nc}"
-      fatal_error "${port}"
+            fatal_error "${port}" #
     fi
     export bind_port_response
 >&2    echo -e "${green}OK!${nc}" #
@@ -252,7 +262,7 @@ while true; do
     if [ -z "${pf_firstrun+y}" ] #
     then ((pf_firstrun++))
          _logger "Forwarded port    $port" #
-         _logger "Refreshed at      $(date)"
+         _logger "Refreshed at      $(date)" #
          _logger "Expires at        $(date --date="$expires_at")" #
          _logger "${BASH_SOURCE##*/} must remain active to use port forwarding," #
          _logger "and will refresh every 15 minutes." #
@@ -261,5 +271,4 @@ while true; do
 
     # sleep 15 minutes
     sleep 900
-
 done
