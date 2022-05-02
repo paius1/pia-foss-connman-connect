@@ -6,6 +6,17 @@
   #     _pia_notify 'message' 'display time' 'image file'
   # logging function
   #     _logger 'message' [ logfile ]
+  # This section allows reading from a tee
+  #
+   # wait for stdin
+     #sleep 0.01
+     #if read -t 0
+   #
+   # e.g. echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
+   # or  echo "Hello World" |
+   #     tee >( _logger [log [source]]) >(_is_not_tty && _pia_notify [displaytime [image]]) >/dev/null
+   #
+  #
   # get file creation time 
   # check interval now and then
   # convert seconds to 'X hrs Y mins Z secs'
@@ -22,13 +33,18 @@
     function _logger() {
         local message log source tab spaces date
 
+      # This section allows reading from a tee
+      # e.g. echo "Hello World" | tee >(_logger [log [source]]) >/dev/null
+      # wait for stdin
+        sleep 0.01
         if read -t 0
       # there is something in stdin put it in ${@:1}
         then read -r new_one
              [[ -n "${new_one}" ]] \
                && set -- "${new_one}" "${@:1:2}"
         fi
-        #
+      #
+      #
         message="${1:-lorem ipsum dolor sit amet}"
         log="${2:-$LOG}"
       # in case $LOG is not set
@@ -71,12 +87,17 @@
     function _pia_notify() {
         local message displaytime image image_path show_image
 
+      # This section allows reading from a tee
+      # e.g. echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
+      # wait for stdin
+        sleep 0.01
         if read -t 0
       # there is something in stdin put it in ${@:1}
         then read -r new_one
              [[ -n "${new_one}" ]] \
                && set -- "${new_one}" "${@:1:2}"
         fi
+        #
         #
         message="${1:-lorem ipsum dolor sit amet}"
         displaytime="${2:-5000}"
@@ -150,3 +171,46 @@
  }
     export -f _is_not_tty
 
+    function _print_connection_instructions() {
+        
+        if _is_tty
+      # running interactively
+        then
+             echo -e "to connect manually go to"
+             echo -e "\tSettings > Coreelec > Connections, select WireGuard and connect"
+             echo -e "\t    This may not set DNS and"
+             echo -e "\t    WILL NOT set iptables killswitch!?"
+             echo -e "\tiptables-restore $(pwd)/rules-wireguard.v4     WILL!"
+             echo
+             echo  -e "\tTo (re)enable port forwarding run\n" 
+             echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh"
+             if [[ "${PIA_PF}" != 'true' ]]
+           # add caveat
+             then
+                  echo
+                  echo -e "\tThe location used must be port forwarding enabled, or this will fail."
+                  echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
+             fi
+             echo -e "\n\tport_forwading.sh must be left running to maintain the port"
+             echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background"
+             echo
+        else
+      # running non-interactively, log and Gui.Notifications
+        # two lines that require scrolling really mess up estuary etc.
+        # and some skins don't scroll and limit the number of lines
+             echo 'Saved configuration for '"${REGION_NAME}"' ' |
+              tee >(_logger) >(_pia_notify)
+             sleep 5
+             echo "Goto Settings>Coreelec>Connections" |
+              tee >(_logger) >(_pia_notify 10000 )
+             sleep 10
+             echo "This precludes port forwarding and setting a safe firewall" |
+              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png')
+             sleep 6
+             echo "Set CONNMAN_CONNECT=true to avoid this" |
+              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png')
+             sleep 6
+        fi
+    return 0
+ }
+    export -f _print_connection_instructions
