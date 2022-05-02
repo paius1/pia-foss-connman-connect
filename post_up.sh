@@ -20,58 +20,75 @@
 
     export PATH=/opt/bin:/opt/sbin:"${PATH}" #
 
-# DEBUGGING #
-# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/kodi_assets/functions
     [[ -z "${kodi_user}" ]] \
-      && source ./kodi_assets/functions #
+      && source ./kodi_assets/functions
 
 # DEBUGGING
 #LOG="${LOG:-/tmp/pia-wireguard.log}"
 #_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
 #exec > >(tee -a $LOG) #2>&1
 
+  # need AUTOCONNECT
+    eval "$(awk '/AUTOCONNECT/ && !/^[:blank:]*#/{print $0}' .env 2>/dev/null)"
+
+  # post_up.sh is kind of a misnomer
+    if [[ ! "${CONNMAN_CONNECT}" =~ ^[t|T] ]] \
+         &&
+       [[ "${AUTOCONNECT:-false}" =~ ^[f|F] ]] #
+  # both systemd and the user don't want to connect
+    then echo 'AUTOCONNECT='"${AUTOCONNECT}"' CONNMAN_CONNECT='"${CONNMAN_CONNECT}"'' |
+         tee >( _logger ) >( _is_not_tty && _pia_notify 6000 'pia_off_48x48.png' ) >/dev/null
+           sleep 6
+         _print_connection_instructions
+         exit 0
+    fi
+
     if [[ "${PRE_UP_RUN}" != 'true' ]]
     then >&2 _logger "Finishing up ..."; fi
 
-  # by moving out of connect_to...sh we lost $SERVICE and $REGION_NAME
-    eval "$(</storage/.config/wireguard/connman.vars )"
+  # by moving out of connect_to_w...sh we lost $SERVICE and $REGION_NAME
+  # _is_tty then cli might be set (exported by connect_to_w....sh)
+    cli="${cli:-}"
+  # from ~/.config/wireguard/pia${cli}.config #
+    eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia${cli}.config |  sed 's/\./_/g;s/ = \(.*\)$/="\1"/g')" #
+    REGION_NAME="$( awk -F[][] '{print $2}' <<< "${Name}")"
+    SERVICE="vpn_$(sed 's/\./_/g' <<< "${Host}")_${Domain}"
 
   # Connect with connmanctl
     if connmanctl connect "${SERVICE}"
   # SUCCESS
     then
          if _is_tty
-        # RUNNING INTERACTIVELY #
+       # running interactively #
          then echo
-              echo "    The WireGuard interface got created.
-        At this point, internet should work via WIREGUARD VPN.
-
-    To disconnect the VPN, run:
-
-        $(pwd)/shutdown.sh
-"
-_pia_notify 'Successfully connected to '"${REGION_NAME}"' '
+              echo "    The WireGuard interface was created."
+              echo "    At this point, internet should work via WIREGUARD VPN."
+              echo 
+              echo "    To disconnect the VPN, run:"
+              echo 
+              echo "    $(pwd)/shutdown.sh"
+              echo 
          else
-              _logger 'Successfully connected to '"${REGION_NAME}"' '
-              _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
-              ## sleep 2 # for notification #
-         fi #
-    else echo "CONNMAN service ${SERVICE} failed!"
-  # FAILED
-         _is_not_tty \
-           && _pia_notify "    FAILED            "
-         _logger "    FAILED            "
-         exit 255 #
-    fi #
+       # or not #
+              echo 'Successfully connected to '"${REGION_NAME}"' ' |
+              tee >(_logger ) >(_pia_notify 5000 'pia_on_48x48.png' ) >/dev/null #
+              sleep 3 # for notification
+         fi
+    else
+  # FAILURE
+         echo 'CONNMAN failed to connect to '"${REGION_NAME}"'!' |
+         tee >( _logger ) >( _is_not_tty _pia_notify 10000 'pia_off_48x48.png' ) >/dev/null
+         exit 255
+    fi
 
-    if [[ "${PIA_DNS:-true}" == "true" ]] #
+    if [[ "${PIA_DNS:-true}" == "true" ]]
   # Check and reset nameservers set by connmanctl #
-    then DNS="${DNS:-$(awk '/WireGuard.DNS/{printf "%s", $3}'  ~/.config/wireguard/pia.config)}" #
-         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${DNS}" ]] #
+    then
+         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${DNS:-10.0.0.243}" ]] #
        # connman subordinates vpn dns to any preset nameservers #
-         then _logger "Replacing Connman's DNS with PIA DNS" #
+         then _logger "Replacing Connman's DNS with PIA's DNS" #
             # replace headers and first nameserver with $DNS to temporary file
-              sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS}/}" \
+              sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS:-10.0.0.243}/}" \
                      /run/connman/resolv.conf #
               echo #
          fi #
@@ -104,8 +121,8 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
        # allow rest of post_up.sh to run
          (sleep 2
           chmod +x /opt/etc/piavpn-manual/port_forward.cmd
-          eval /opt/etc/piavpn-manual/port_forward.cmd >> /tmp/port_forward.log 2>/dev/null
-           )&
+          eval /opt/etc/piavpn-manual/port_forward"${cli}".cmd > /tmp/port_forward.log
+         )&
          disown
     fi #
 
@@ -114,21 +131,26 @@ _pia_notify 'Successfully connected to '"${REGION_NAME}"' '
 # Note to self:                                         #
 # Check /storage/.config/autostart.sh for any conflicts #
 #########################################################
-    if [[ "$(awk -F'.' '{print $1}' < /proc/uptime)" -lt 60 ]] #
-  # SYSTEM START wait and load ip_tables module #
-    then echo "taking 3" #
-         if ! lsmod | grep -q '^ip_tables' #
+    up="$(</proc/uptime)"
+    if [[ "${up%%.*}" -lt 60 ]]
+  # SYSTEM START, wait and load ip_tables module
+    then _logger "taking 3"
+         sleep 3
+         if ! lsmod |
+              grep -q '^ip_tables'
        # ip_tables module not loaded yet Don't know when it normally is
-         then echo ip_tables module not loaded #
-              modprobe ip_tables #
-              sleep 1 #
-         fi #
-         lsmod | grep -q '^ip_tables' \
-         && echo -e "\nip_tables module loaded\n" #
-    fi #
+         then _logger "ip_tables module not loaded"
+              modprobe ip_tables
+              sleep 1
+         fi
+         lsmod |
+         grep -q '^ip_tables' \
+            && _logger "ip_tables module loaded"
+    fi
 
-    echo "Setting up firewall" #
-    iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}" #
+    echo "Setting up firewall"
+#    eval "$(awk '/WG_FIREWALL/ && !/^[:blank:]*#/{print $0}' .env 2>/dev/null)"
+    iptables-restore < "${WG_FIREWALL:-rules-wireguard.v4}"
 
   # Add any applications to start after this
 
