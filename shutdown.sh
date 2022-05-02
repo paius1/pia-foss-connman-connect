@@ -36,58 +36,69 @@
 #_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
 #exec > >(tee -a $LOG) #2>&1
 
-  # running from favourites and a systemd service file exits then use systemd
-  # 1) unit exists 2) not called by systemd, and 3) not running in a shell #
-    if
-    _is_unset PRE_UP_RUN \
-      && \
-    _is_not_tty \
-      && \
-    [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]] #
-  # systemd service exists, not called, and we are running non-interactively  
+  # How was this script called [systemd|favourites|interactively] #
+  # systemd: continue #
+  # favourites: pia-wireguard.service exist? #
+  #             YES: stop service #
+  #             NO: set logfile and continue #
+  # interactively: set PRE_UP_RUN to cli #
+  # 
+    if _is_unset PRE_UP_RUN \
+         &&
+       _is_not_tty \
+         &&
+       [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]]
+  # not called by systemd or interactively, and systemd service exists #
     then systemd-cat -t pia-wireguard.favourites -p warning \
                      <<< "Stopping pia-wireguard.service from outside of systemd"
        # log this in pia-wireguard log #
-         LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' #
+         LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"''
 
          systemctl stop pia-wireguard.service &
+       # call this script with PRE_UP_RUN set
          exit 0
-    elif
-    _is_tty \
-      && \
-    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
-  # Running interactively with systemd service #
-    then SERVICE_STATE="$(systemctl is-active  pia-wireguard.service)" #
+    elif _is_not_tty
+  # non-interactively w/o systemd service
+    then LOG='/tmp/pia-wireguard.log'
 
-         if [[ "${SERVICE_STATE}" =~ ^a ]] #
-       # Service is running #
-         then
-            # notify systemd
-              systemd-cat -t pia-wireguard.cmdline -p warning <<< "Stopping pia-wireguard.service from the command line" #
-
-            # Stop pia-wireguard service This runs runs ./shutdown.sh with PRE_UP_RUN set #
-              systemctl stop pia-wireguard.service & #
-              exit 0
-
-         else PRE_UP_RUN='cli'
-       # clean up _logger messages
-         fi
+    elif _is_tty \
+           &&
+         [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]]
+  # running interactively with systemd service
+    then
+         case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)"
+       # is service active
+         in
+            0|true)  systemd-cat -t pia-wireguard.cmdline -p warning \
+                                <<< "Stopping pia-wireguard.service from the command line"
+                     systemctl stop pia-wireguard.service
+                   # Stop pia-wireguard service returning here with PRE_UP_RUN set
+                ;;
+            *|false) PRE_UP_RUN='cli'
+                ;;
+         esac
+    else
+  # no systemd service
+         LOG='/tmp/pia-wireguard.log'
     fi
     
-  # Disconnect VPN
-
-  # First service is connected service, is it a vpn?
+  # disconnect vpn_
+  # 1st connected service, is it a vpn?
     wg_0="$(connmanctl services | awk 'NR == 1 && /vpn_/ {print $NF}')"
 
     if [[ -n "${wg_0}" ]]
-  # Vpn active
+  # vpn active
     then _logger "$(connmanctl disconnect "${wg_0}")"
-       # GUI Notification
+
+         wg_0_file="$(grep -l --exclude='~$' "${wg_0##*_}" ~/.config/wireguard/*.config)"
+         REGION="$(awk -F[][] '/Name =/{print $2}'  "${wg_0_file}")"
+
+       # GUI notification
          _is_not_tty \
-           && _pia_notify 'Disconnected from '"${REGION}"' ' 7000 "pia_off_48x48.png"
+           && _pia_notify 'Disconnected from '"${REGION}"' ' 5000 "pia_off_48x48.png"; sleep 5
 
        # reset pia.config age
-         touch ~/.config/wireguard/pia.conf
+         touch "${wg_0_file}"
 
     else _logger "No current vpn connection"
   # NO
@@ -96,26 +107,24 @@
   # OKAY now iptables, DNS, route are all mangled?
 
   # Get user defined iptables rules
-    eval "$(awk '/MY_FIREWALL/ && !/^[[:blank:]]*#/{print}' .env)"
-  # user defined or ./openrules.v4
-    MY_FIREWALL="${MY_FIREWALL:-openrules.v4}"
+    eval "$(awk '/MY_FIREWALL=/ && !/^[[:blank:]]*#/{print}' .env)"
 
-  # restore firewall
-    iptables-restore < "${MY_FIREWALL}"
-    _logger "restored ${MY_FIREWALL:-openrules.v4} firewall"
+  # restore firewall (user defined or ./openrules.v4)
+    iptables-restore < "${MY_FIREWALL:=openrules.v4}"
+    _logger "Restored ${MY_FIREWALL} firewall"
 
-  # Check if we can dig it
+  # can we dig it
     if ! dig +time=1 +tries=2 privateinternetaccess.com >/dev/null
-  # No, restore valid nameservers
-    then _logger "restoring DNS nameservers"
+  # NO, restore valid nameservers
+    then _logger "Restoring DNS nameservers"
        # restore a sane DNS .cache/starting_resolv.conf is saved at startup
          if [ -f /storage/.cache/starting_resolv.conf ]
        # Using resolv.conf from start up
          then cp -v /storage/.cache/starting_resolv.conf /run/connman/resolv.conf
          else 
-       # Get nameservers from first active non vpn_ interface
+       # Get nameservers from first active non-vpn_ service
               iface=$(connmanctl services | awk '/^\*/ && !/vpn_/{print $NF; exit}')
-            # Nameserver definition from $iface/settings
+            # nameserver definition from $iface/settings
               mapfile -d ' ' NS < <(awk -F'[=|;]' '/^Nameserver/{printf "%s", $2}' ~/.cache/connman/"${iface}"/settings)
             # or fall back to opendns
               nameserver="${NS[0]:-208.67. 222.222}"
@@ -125,13 +134,16 @@
 EOF
          fi
     else _logger "Can resolve hostnames"
+  # YES
     fi
 
-  # Port Forwarding cleanup
+  # port forwarding cleanup
     pf_pids=($(pidof port_forwarding.sh))
+
     if [ "${#pf_pids[@]}" -ne 0 ]
   # stop port forwarding 
-    then echo "${pf_pids[@]}" | xargs kill -9 >/dev/null 2>&1
+    then echo "${pf_pids[@]}" |
+         xargs -d $'\n' sh -c 'for pid do kill $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
          _logger "Stopped port forwarding"
        # clear the log file ?
          :> /tmp/port_forward.log
@@ -139,13 +151,13 @@ EOF
 
   # flush vpn from routing table?
     if [[ -n "${wg_0}" ]]
-  # PIA was connected. if disconnected from settings this will be missed
+  # PIA was connected. if disconnected from Settings>CoreELEC this will be missed
     then # could try comparing original routing table
        # ip of vpn
-         ip_flush="$(sed 's/^vpn_//;s/_/\./g' <<< "${wg_0}")"
+         ip_flush="$(sed 's/^vpn_//;s/_/\./g' <<< "${wg_0%_*}")"
          ip route flush "${ip_flush}" 
        # removed from the routing table
-         _logger "flushed vpn ${ip_flush} from routing table"
+         _logger "Flushed vpn ${ip_flush} from routing table"
     fi
 
 # add anything else such stopping applications and port forwarding
