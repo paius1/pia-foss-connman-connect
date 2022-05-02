@@ -28,7 +28,7 @@
 # 
 
   # PIA's scripts are set to a relative path #
-    cd "${0%/*}" #
+    cd "${0%/*}" || exit 1 #
 
     export PATH=/opt/bin:/opt/sbin:"${PATH}" #
 
@@ -128,7 +128,8 @@ fi
             then unset pids[$i] #
             fi #
          done #
-         echo "${pids[@]}" | xargs kill -9 >/dev/null 2>&1 #
+         echo "${pf_pids[@]}" |
+         xargs -d $'\n' sh -c 'for pid do kill $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
     fi #
 
   # wait for privateinternetaccess this could be an infinite loop #
