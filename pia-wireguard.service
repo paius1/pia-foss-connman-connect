@@ -4,15 +4,27 @@ Description=WireGuard VPN Service
 After=network-online.target nss-lookup.target connman-vpn.service time-sync.target entware.service
 Wants=network-online.target nss-lookup.target connman-vpn.service time-sync.target entware.service
 
+ConditionFileNotEmpty=/path/to/scripts/.env
 ; Predefined variables for the pia-foss manual connections scripts
 ; without these the pia-foss/manual-connections scripts run interactively
-; these should be save to ./.env
 ;
 ; minimum file:
 ;               PIA_USER=pXXXXXXX
 ;               PIA_PASS=p45sw0rdxx
-
-ConditionFileNotEmpty=/path/to/scripts/.env
+;
+; optional:     AUTOCONNECT='true|false' if true PREFERRED_REGION is ignored (default false)
+;               ||
+;               PREFERRED_REGION= run PIA_PF='true|false' ./get_region.sh for options
+;
+;               PIA_PF='true|false' (default false)
+;               PIA_DNS='true|false' (default true)
+;               MAX_LATENCY='timeout in seconds' (default 0.05)
+;
+; optional: must be exported to work with scripts
+;               export MY_FIREWALL=/path/to/openrules.v4
+;               export WG_FIREWALL=/path/to/rules-wireguard.v4
+;               export CONNMAN_CONNECT='true'
+;           CONNMAN_CONNECT=true & AUTOCONNECT=false, honors PREFERRED_REGION
 
 [Service]
 Type=oneshot
