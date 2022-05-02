@@ -65,12 +65,11 @@
   #             NO: set logfile and continue #
   # interactively: set PRE_UP_RUN to cli #
   # 
-    if #
-    _is_unset PRE_UP_RUN \
-      && \
-    _is_not_tty \
-      && \
-    [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
+    if _is_unset PRE_UP_RUN \
+         &&
+       _is_not_tty \
+         &&
+       [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
   # not called by systemd or interactively, and systemd service exists #
     then systemd-cat -t pia-wireguard.favourites -p warning \
                      <<< "(Re)starting pia-wireguard.service from outside of systemd" #
@@ -82,24 +81,23 @@
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
        # is service active #
          in #
-              0|true)  SRe='Res' #
+              0|true)  SRe_prefix='Res' #
                        systemctl restart pia-wireguard.service & #
                      ;; #
-              *|false) SRe='S' #
+              *|false) SRe_prefix='S' #
                        systemctl start pia-wireguard.service & #
              ;; #
          esac #
 
-         systemd-cat -t pia-wireguard.favourites -p info <<< "${SRe}tarted pia-wireguard.service" #
+         systemd-cat -t pia-wireguard.favourites -p info <<< "${SRe_prefix}tarted pia-wireguard.service" #
        # log this to systemd journal and pia-wireguard log #
-         LOG=/tmp/pia-wireguard.log _logger "${SRe}tarted pia-wireguard.service" #
+         LOG=/tmp/pia-wireguard.log _logger "${SRe_prefix}tarted pia-wireguard.service" #
 
          exit 0 #
 
-    elif #
-    _is_unset PRE_UP_RUN \
-       && \
-    _is_not_tty #
+    elif _is_unset PRE_UP_RUN \
+            && \
+         _is_not_tty #
   # NO systemd, set LOG #
     then export LOG="${LOG:-/tmp/pia-wireguard.log}" #
          _logger "found no systemd service logging to ${LOG}" #
@@ -108,8 +106,25 @@
          sleep 5 #
 
     elif _is_unset PRE_UP_RUN #
-  # run is interactive: set PRE_UP_RUN #
+  # run is interactive: set PRE_UP_RUN and check with systemd #
     then export PRE_UP_RUN='cli' #
+
+         case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
+       # is systemd service active #
+         in #
+              0|true)  printf "PIA Wireguard running as a service, continue? ([N]o/[y]es): " #
+                       read -r continue #
+                       grep -iq -v 'y' <<< "${continue:0:1}" \
+                            && { echo "Goodbye";
+                            exit 0; } #
+                       systemd-cat -t pia-wireguard.cmdline -p warning \
+                                  <<< "Stopping pia-wireguard.service from the command line" #
+                     # Stop pia-wireguard service #
+                       systemctl stop pia-wireguard.service #
+                     ;; #
+              *|false) echo "pia-wireguard service is not running" #
+             ;; #
+         esac #
     fi #
 
   # possible variables for .env #
@@ -158,18 +173,17 @@
 
   # changes in .env file? # NOTE to self when disconnecting touch pia.config to reset creation time
   # If NO and pia.config is < 24hrs old, skip to ./post_up.sh #
-    if #
-    _is_not_tty \
-      && \
-    [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
+    if _is_not_tty \
+         &&
+       [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
   # not running interactively, have checksum for previous .env #
     then _logger "    Checking current .env file with previous" #
 
          if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
        # .env is unchanged #
          then _logger "    .env is unchanged" #
-
               age_pia_config="$(_interval "$(_created ~/.config/wireguard/pia.config)")" #
+
               if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
             # wireguard/pia.config is less that 24 hours old   #
               then _logger "    pia.config is $(_hmmss "${age_pia_config}") old" #
@@ -177,13 +191,12 @@
                  # exit for systemd ExecStartPost, or call ./post_up.sh & exit for favourites #
                    case "${PRE_UP_RUN}" in #
                         t*) exit 0 ;; #
-                      # systemd calls ./post_up.sh  
                         *)  ./post_up.sh & exit 0 ;; #
-                   esac
+                   esac #
               fi #
 
-         else  _logger "      .env file has changed, running thru setup" #
-       # Save checksum for new file #
+         else _logger "      .env file has changed, running thru setup" #
+       # Save checksum for changed file #
                sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          fi #
 
@@ -192,11 +205,12 @@
     then sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
 
-    else echo "Running interactively skipped checksum and .env check" #
+#    else echo "Running interactively skipped checksum and .env check" #
   # running interactively #
     fi #
 
   # NON-INTERACTIVE VARIABLE CHECK #
+
     if _is_not_tty #
   # running non-interactive kit check" #
     then #
@@ -206,10 +220,9 @@
          export BOTHER=14000 #
 
        # Check credentials #
-         if #
-         _is_empty "${PIA_USER}" \
-          || 
-         _is_empty "${PIA_PASS}" #
+         if _is_empty "${PIA_USER}" \
+             || 
+            _is_empty "${PIA_PASS}" #
        # NO CREDENTIALS, we can forgetabout it #
          then _pia_notify "Missing PIA Credentials" "${BOTHER}" #
               sleep "$((BOTHER/1000+1))" #
@@ -220,59 +233,59 @@
        # PREFERRED_REGION|AUTOCONNECT will create a connman config  with no interaction #
        # AUTOCONNECT|CONNMAN_CONNECT = false|null requires using Settings > CoreELEC > Connections #
        #   and sets NO FIREWALL or port forwarding #
-         if #
-         _is_empty "${PREFERRED_REGION}" \
-          || 
-         _is_empty "${AUTOCONNECT}" \
-          || 
-         _is_empty "${MAX_LATENCY}" #
-       # Set them #
-         then 
-                function _AUTOCONNECT_or_PREFERRED_REGION() { #
-              # AUTOCONNECT=true negates PREFERRED_REGION
-                    if [[ "${AUTOCONNECT}" =~ ^t ]] #
-                    then echo "the fastest server" #
-                         _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "$((BOTHER/2))" #
-                         sleep "$((BOTHER/2000))" #
-                    else echo "${PREFERRED_REGION}" #
-                    fi #
-               }
 
-              # Set AUTOCONNECT="${AUTOCONNECT:-false}" and go from there #
-                AUTOCONNECT="${AUTOCONNECT:-false}" # Keep AUTOCONNECT if set #
-                if ! _is_empty "${PREFERRED_REGION}" #
-              # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
-                then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
-                else 
-              # PREFERRED_REGION not set #
-                     [[ "${AUTOCONNECT}" =~ ^f ]] \
+         if _is_empty "${PREFERRED_REGION}" \
+             || 
+            _is_empty "${AUTOCONNECT}" \
+             || 
+            _is_empty "${MAX_LATENCY}" #
+       # Set them #
+         then #
+              function _AUTOCONNECT_or_PREFERRED_REGION() { #
+            # AUTOCONNECT=true negates PREFERRED_REGION #
+                  if [[ "${AUTOCONNECT}" =~ ^t ]] #
+                  then echo "the fastest server" #
+                       _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "$((BOTHER/2))" #
+                       sleep "$((BOTHER/2000))" #
+                  else echo "${PREFERRED_REGION}" #
+                  fi #
+              } #
+
+            # ensure AUTOCONNECT is set, and go from there #
+              AUTOCONNECT="${AUTOCONNECT:-false}" #
+
+              if ! _is_empty "${PREFERRED_REGION}" #
+            # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
+              then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
+              else  #
+            # PREFERRED_REGION not set #
+                   [[ "${AUTOCONNECT}" =~ ^f ]] \
                      && MAX_LATENCY="${MAX_LATENCY:=0.05}" #
-                     via="the fastest server" #
-                fi #
-         elif _is_empty "${MAX_LATENCY}"
+                   via="the fastest server" #
+              fi #
+         elif _is_empty "${MAX_LATENCY}" #
        # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
          then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
          fi #
 
        # BOTHER ABOUT PREFERRED_REGION='' BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
          _is_empty "${PREFERRED_REGION}" \
-                   && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
-                        sleep "$((BOTHER/1000))"; } #
+            && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
+                 sleep "$((BOTHER/1000))"; } #
 
        # Set PIA_PF and PIA_DNS. Notify if forcing PIA_DNS #
          PIA_PF="${PIA_PF:-false}" #
 
          if _is_empty "${PIA_DNS}" #
-         then export PIA_DNS='true' #
-              _pia_notify "FORCED PIA DNS" #
-              sleep 2
+         then _pia_notify "FORCED PIA DNS"; sleep 2 #
+              export PIA_DNS='true' #
          fi #
 
          _pia_notify 'getting details for '"${via}"'' #
     fi #
 
-  # PRE_UP_RUN is set true by systemd, and 'cli' if _is_tty #
-  # if not set then call ./pre_up.sh
+  # PRE_UP_RUN has been set true by systemd, or 'cli' if _is_tty #
+  # if not then call ./pre_up.sh
     if _is_unset PRE_UP_RUN #
   # No systemd service or not running interactively #
     then #:> "${LOG}" #
@@ -280,8 +293,11 @@
          ./pre_up.sh #
     fi #
 
-# end of major changes
-
+#
+########################
+# end of major changes #
+########################
+#
 # Check if terminal allows output, if yes, define colors for output
 if [[ -t 1 ]]; then
   ncolors=$(tput colors 2>/dev/null)
