@@ -614,7 +614,7 @@ For example, you can try 0.2 for 200ms allowed latency.
         break
               # running non-interactively got ordered list choosing fastest #
                 else # choose best region and proceed #
-                     PREFERRED_REGION=$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList ) # 
+                     PREFERRED_REGION=$( awk 'NR == 1 {print $2}' /opt/etc/piavpn-manual/latencyList ) # 
                      REGION="$(/opt/bin/jq -r '.name' < /opt/etc/piavpn-manual/regionData )" #
                      export PREFERRED_REGION #
                      _pia_notify 'Selected for '"${REGION}"'' #
