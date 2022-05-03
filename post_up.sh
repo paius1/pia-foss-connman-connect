@@ -200,7 +200,7 @@
             # allow post_up.sh to continue
               ( sleep 2
                 source /opt/etc/piavpn-manual/port_forward"${cli}".cmd >> /tmp/port_forward.log 2>&1
-              )& >/dev/null
+              )>/dev/null & 
               disown
          else echo "Failed to get a valid token"
               PIA_PF=false
