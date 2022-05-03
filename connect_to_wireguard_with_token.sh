@@ -155,14 +155,14 @@ echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
     if _is_tty \
          &&
        [[ -s /opt/etc/wireguard/pia.conf ]] #
-    then printf '%s\n' "Wireguard configuration exists, overwrite? ([Y]es/[n]o): " #
+    then printf '%s\n' "exists, overwrite? ([Y]es/[n]o): " #
   # overwrite existing pia.conf running interactively #
   # (default is Yes, No to add -cli to filename #
          read -r continue #
          if grep -iq n <<< "${continue:0:1}" #
          then plus='-cli' #
        # NO, add '-cli' to file name #
-              echo -n "write to /opt/etc/wireguard/pia${plus}.conf..."
+              echo -n "writing to /opt/etc/wireguard/pia${plus}.conf..."
          fi #
     fi #
 
@@ -192,6 +192,7 @@ echo -e "${green}OK!${nc}"
 
   # convert wireguard .conf to connman .config #
   # read pia${plus}.conf into variables #
+    declare Address PrivateKey PersistentKeepalive PublicKey AllowedIPs Endpoint
     eval "$(grep -e '^[[:alpha:]]' /opt/etc/wireguard/pia"${plus}".conf | sed 's| = |=|')" #
 
     echo -n "Trying to write connman pia.config..." #
@@ -201,13 +202,13 @@ echo -e "${green}OK!${nc}"
     if _is_tty \
          &&
        [[ -s /storage/.config/wireguard/pia.config ]] #
-    then printf '%s\n' "PIA Wireguard configuration exists, overwrite? ([N]o/[y]es): " #
+    then printf '%s\n' "exists, overwrite? ([N]o/[y]es): " #
   # overwrite existing pia.config running interactively? #
          read -r continue #
          if grep -iq -v y <<< "${continue:0:1}" #
          then cli='-(user_added)' #
        # NO, add '-(user added)' #
-              echo -n "write to pia${cli}.config..."
+              echo -n "writing to /storage/.config/wireguard/pia${cli}.config..."
               export cli #
             # export for post_up.sh #
          fi #
@@ -239,6 +240,7 @@ echo -e "${green}OK!${nc}"
 
   # determine names of VPN used by connmanctl #
   # from ~/.config/wireguard/pia${cli}.config #
+    declare Host Domain
     eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia${cli}.config |  sed 's?\.?_?;s| = \(.*\)$|="\1"|')" #
     SERVICE="vpn_${Host//./_}${Domain/#/_}"
 
@@ -328,10 +330,9 @@ echo -e "${green}OK!${nc}"
 
   # Moving port forwarding to post_up.sh loses all of these variables #
   # save the command to a file, and eval post_up #
-    echo " PIA_PF=${PIA_PF} PIA_TOKEN=${PIA_TOKEN} \\
+    echo " PIA_TOKEN=${PIA_TOKEN} \\
  PF_GATEWAY=${WG_SERVER_IP} PF_HOSTNAME=${WG_HOSTNAME} \\
- $(pwd)/port_forwarding.sh" |
-    tee -i /opt/etc/piavpn-manual/port_forward"${cli}".cmd #
+ $(pwd)/port_forwarding.sh" > /opt/etc/piavpn-manual/port_forward"${cli}".cmd #
 
     if [[ "${PRE_UP_RUN}" != 'true' ]] #
     then echo -e "Not called by systemd" #
