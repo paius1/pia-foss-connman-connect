@@ -6,26 +6,27 @@
   #     _pia_notify 'message' 'display time' 'image file'
   # logging function
   #     _logger 'message' 'logfile' 'calling script'
-  # This section allows reading from a tee
-   ########################################
-   #     sleep 0.01
-   #     read -t 0 \
-   #       && new_1=$(</dev/stdin)
-   #     _is_empty "${new_1}" \
-   #       || set -- "${new_1}" "${@:1:2}"
-   ########################################
+  # 
+   ##This section #################################
+   #        sleep 0.01
+   #        read -t 0 \
+   #          && new_1=$(</dev/stdin)
+   #        _is_empty "${new_1}" \
+   #          || set -- "${new_1}" "${@:1:2}"
+   ################### allows reading from a tee ##
    # e.g.
    # echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
    #  or
    # echo "Hello World" |
    # tee >(_logger [log [source]]) >(_is_not_tty && _pia_notify [displaytime [image]]) >/dev/null
-   #
+   #################################################
   #
   # get file creation time 
-  # check interval now and then
+  # check interval now-then
   # convert seconds to 'X hrs Y mins Z secs'
   # check for empty/unset variables n.b. test unset passes VARIABLE NAME ONLY
   # run is interactive or not
+  # display connection steps to screen or tty
 
   # credentials for local kodi
     kodi_user=kodi
