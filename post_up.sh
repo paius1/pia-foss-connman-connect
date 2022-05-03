@@ -28,8 +28,26 @@
 #_logger "Starting $(pwd)/${BASH_SOURCE##*/}"
 #exec > >(tee -a $LOG) #2>&1
 
-  # need AUTOCONNECT and WG_FIREWALL
-    eval "$(awk '/AUTOCONNECT=|WG_FIREWALL=/ && !/^[:blank:]*#/{print $0}' .env 2>/dev/null)"
+  # by moving actual connection out of connect_to_w...sh
+  # we lost $AUTOCONNECT $SERVICE, $REGION_NAME, etc.
+    source .env 2>/dev/null
+    AUTOCONNECT="${:-false}"
+    PIA_PF="${PIA_PF:-false}"
+    PIA_DNS="${PIA_DNS:-true}"
+
+  # WG_SERVER_IP=$Host=WG_SERVER_IP WG_HOSTNAME=$Domain=PF_HOSTNAME DNS=$WireGuard_DNS
+  # from ~/.config/wireguard/pia${cli}.config (cli is passed when _is_tty)
+    eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia"${cli}".config |
+            sed 's/\./_/g;s/ = \(.*\)$/="\1"/g')"
+
+    mapfile -t tokenFile < /opt/etc/piavpn-manual/token
+    PIA_TOKEN="${tokenFile[0]}"
+    WG_SERVER_IP="${Host}"
+    WG_HOSTNAME="${Domain}"
+
+    SERVICE="vpn_${Host//./_}${Domain/#/_}"
+    [[ "${Name}" =~ \[(.*)\] ]]
+    REGION_NAME="${BASH_REMATCH[1]:-}"
 
   # post_up.sh is kind of a misnomer
     if [[ ! "${CONNMAN_CONNECT}" =~ ^[t|T] ]] \
@@ -40,21 +58,14 @@
          echo 'AUTOCONNECT='"${AUTOCONNECT}"' CONNMAN_CONNECT='"${CONNMAN_CONNECT}"'' |
          tee >( _logger ) >( _is_not_tty && _pia_notify 6000 'pia_off_48x48.png' ) >/dev/null
            sleep 6
+
          _print_connection_instructions
          exit 0
     fi
 
+  # message for _is_tty and pia-wireguard.log
     if [[ "${PRE_UP_RUN}" != 'true' ]]
     then >&2 _logger "Finishing up ..."; fi
-
-  # by moving out of connect_to_w...sh we lost $SERVICE and $REGION_NAME
-  # _is_tty then cli might be set (exported by connect_to_w....sh)
-    cli="${cli:-}"
-  # from ~/.config/wireguard/pia${cli}.config #
-    eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia${cli}.config |
-            sed 's/\./_/g;s/ = \(.*\)$/="\1"/g')" #
-    REGION_NAME="$( awk -F[][] '{print $2}' <<< "${Name}")"
-    SERVICE="vpn_$(sed 's/\./_/g' <<< "${Host}")_${Domain}"
 
   # Connect with connmanctl
     if connmanctl connect "${SERVICE}"
@@ -83,15 +94,15 @@
          exit 255
     fi
 
-    if [[ "${PIA_DNS:-true}" == "true" ]]
+    if [[ "${PIA_DNS}" == "true" ]]
     then
   # Check and reset nameservers set by connmanctl
-         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${DNS:-10.0.0.243}" ]]
+         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${WireGuard_DNS}" ]]
          then _logger "Replacing Connman's DNS with PIA's DNS"
        # connman subordinates vpn dns to any preset nameservers
             # replace headers and first nameserver with $DNS to temporary file
-              sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${DNS:-10.0.0.243}/}" \
-                  /run/connman/resolv.conf
+              sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${WireGuard_DNS:-10.0.0.243}/}" \
+              /run/connman/resolv.conf
               echo
          fi
        # https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
@@ -99,16 +110,12 @@
          #_pia_notify 'DNS server is '"${DNS_SERVER}"' ' 10000; sleep 9
     fi #
 
-  # moved from connect_to_wireguard.sh thus losing all the variables
-    eval "$(awk -F'/' '{print $1}' /opt/etc/piavpn-manual/port_forward"${cli}".cmd )"
-
-  # This section did exit the script if PIA_PF is not set to "true".
-  # the command for port forwarding will be sent to /tmp/port_forward.log
+  # the command for port forwarding was saved in /opt/etc/piavpn-manual/port_forward[-(user_added)].cmd
     if [[ $PIA_PF != "true" ]]
     then
   # print instructions for starting port forwarding later
          echo -e "    To enable port forwarding run\n"
-         echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh" #| tee /tmp/port_forward.log
+         echo -e "    $(< /opt/etc/piavpn-manual/port_forward.cmd )"
          echo
          echo -e "    The location used must be port forwarding enabled, or this will fail."
          echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
@@ -134,19 +141,19 @@
 #########################################################
     up="$(</proc/uptime)"
     if [[ "${up%%.*}" -lt 60 ]]
-  # SYSTEM START, wait and load ip_tables module
     then _logger "taking 3"
-         sleep 3
-         if ! lsmod |
-              grep -q '^ip_tables'
-       # ip_tables module not loaded yet Don't know when it normally is
+  # SYSTEM START, wait and load ip_tables module
+         #sleep 3
+
+         if [[ ! "$(lsmod)" =~ ip_tables[[:blank:]] ]]
          then _logger "ip_tables module not loaded"
+       # ip_tables module not loaded yet Don't know when it normally is
               modprobe ip_tables
               sleep 1
          fi
-         lsmod |
-         grep -q '^ip_tables' \
-            && _logger "ip_tables module loaded"
+
+         [[ "$(lsmod)" =~ ip_tables[[:blank:]] ]] \
+           && _logger "ip_tables module loaded"
     fi
 
   # Iptables-restore vpn killswitch #
