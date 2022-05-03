@@ -313,7 +313,7 @@ if [[ -z $PIA_TOKEN ]]; then
 # dont delete, can reuse for 24 hours #
 #rm -f /opt/etc/piavpn-manual/token #
 else
-  echo -e "Using existing token ${green}\$PIA_TOKEN${nc}." #
+  echo -e "Using existing token ${green}$PIA_TOKEN${nc}." #
   echo
 fi
 
@@ -324,7 +324,7 @@ if [[ $VPN_PROTOCOL == "wireguard" ]]; then
             # running interactively #
   echo "The ./get_region.sh script got started with"
   echo -e "${green}VPN_PROTOCOL=wireguard${nc}, so we will automatically connect to WireGuard,"
-        echo -e "\tPREFERRED_REGION=\"$( awk 'NR == '1' {print $2}' /opt/etc/piavpn-manual/latencyList )\"" #
+        echo -e "\tPREFERRED_REGION=\"${bestServer_region}\"" #
   echo "by running this command:"
   echo -e "$ ${green}\tPIA_TOKEN=$PIA_TOKEN \\" # added tabs
   echo "\tWG_SERVER_IP=$bestServer_WG_IP WG_HOSTNAME=$bestServer_WG_hostname \\" #

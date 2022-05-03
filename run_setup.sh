@@ -72,7 +72,7 @@
        [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
     then 
   # not called by systemd or interactively, and systemd service exists #
-         systemd-cat -t pia-wireguard.favourites -p warning \
+         systemd-cat -t pia-wireguard.favourites -p notice \
                     <<< "(Re)starting pia-wireguard.service from outside of systemd" #
        # log this to systemd journal and pia-wireguard log #
          LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' #
@@ -90,7 +90,7 @@
              ;; #
          esac #
 
-         systemd-cat -t pia-wireguard.favourites -p info \
+         systemd-cat -t pia-wireguard.favourites -p notice \
                     <<< "${SRe_prefix}tarted pia-wireguard.service" #
        # log this to systemd journal and pia-wireguard log #
          LOG=/tmp/pia-wireguard.log _logger "${SRe_prefix}tarted pia-wireguard.service" #
@@ -123,7 +123,7 @@
                           exit 0; } #
 
                    # log this to systemd journal #
-                     systemd-cat -t pia-wireguard.cmdline -p warning \
+                     systemd-cat -t pia-wireguard.cmdline -p notice \
                                 <<< "Stopping pia-wireguard.service from the command line" #
                      systemctl stop pia-wireguard.service #
                    # Stop pia-wireguard service #
@@ -187,7 +187,7 @@
          if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
          then _logger "    .env is unchanged" #
        # .env is unchanged #
-              age_pia_config="$(_interval "$(_created ~/.config/wireguard/pia.config)")" #
+              age_pia_config="$(_interval "$(_created /storage/.config/wireguard/pia.config)")" #
 
               if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
               then _logger "    pia.config is $(_hmmss "${age_pia_config}") old" #
@@ -200,6 +200,9 @@
                       *)  ./post_up.sh & exit 0 ;; #
                     # call ./post_up.sh & exit for favourites #
                    esac #
+              else _logger "Need fresh pia.config" #
+            # day old config #
+                   rm -v /storage/.config/wireguard/pia.config
               fi #
 
          else _logger "      .env file has changed, running thru setup" #
@@ -207,7 +210,7 @@
                sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
          fi #
 
-    elif ! [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
+    elif [[ ! -s /opt/etc/piavpn-manual/sha1sum.env ]] #
     then echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
   # create /opt/etc/piavpn-manual/sha1sum.env #
          sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
@@ -332,7 +335,7 @@ fi
 
     # Erase previous authentication token if present
     # changed paths from /opt/ #
-    # and commented rm token as it can be used for 24 hrs #
+    # and commented rm token, is valid for 24 hrs #
     #rm -f /opt/etc/piavpn-manual/token /opt/etc/piavpn-manual/latencyList #
     #rm -f /opt/etc/piavpn-manual/latencyList #
 
@@ -387,12 +390,10 @@ while :; do
   done
   export PIA_PASS
 
-  # Confirm credentials and generate token
-  ./get_token.sh
-# DEBUGGING
-echo REGION CHECKED BEFORE THIS
           # changed tokenLocation #
             tokenLocation="/opt/etc/piavpn-manual/token" #
+  # Confirm credentials and generate token
+  ./get_token.sh || rm "${tokenLocation}"
   # If the script failed to generate an authentication token, the script will exit early.
   if [[ ! -f $tokenLocation ]]; then
     read -r -p "Do you want to try again ([N]o/[y]es): " tryAgain
@@ -403,7 +404,8 @@ echo REGION CHECKED BEFORE THIS
     PIA_PASS=""
   else
           # read from saved token file
-            PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token ) #
+            mapfile -t tokenFile < /opt/etc/piavpn-manual/token
+            PIA_TOKEN="${tokenFile[0]}"
     export PIA_TOKEN
 # token is good for 24 hours according to PIA #
     #rm -f /opt/etc/piavpn-manual/token #
@@ -573,7 +575,7 @@ For example, you can try 0.2 for 200ms allowed latency.
         i=0
         while read -r line; do
           i=$((i+1))
-            # modified path #
+        # modified path #
             time=$( awk 'NR == '$i' {print $1}' /opt/etc/piavpn-manual/latencyList ) #
             id=$( awk 'NR == '$i' {print $2}' /opt/etc/piavpn-manual/latencyList ) #
             ip=$( awk 'NR == '$i' {print $3}' /opt/etc/piavpn-manual/latencyList ) #
@@ -618,6 +620,7 @@ For example, you can try 0.2 for 200ms allowed latency.
                      _pia_notify 'Selected for '"${REGION}"'' #
                 fi #
       else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
+
            if _is_not_tty #
          # RUNNING NON-INTERACTIVELY #
            then #

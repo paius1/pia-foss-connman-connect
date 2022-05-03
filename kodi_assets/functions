@@ -5,16 +5,20 @@
   # add kodi GUI.Notifications with timeouts and images
   #     _pia_notify 'message' 'display time' 'image file'
   # logging function
-  #     _logger 'message' [ logfile ]
+  #     _logger 'message' 'logfile' 'calling script'
   # This section allows reading from a tee
-  #
-   # wait for stdin
-     #sleep 0.01
-     #if read -t 0
-   #
-   # e.g. echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
-   # or  echo "Hello World" |
-   #     tee >( _logger [log [source]]) >(_is_not_tty && _pia_notify [displaytime [image]]) >/dev/null
+   ########################################
+   #     sleep 0.01
+   #     read -t 0 \
+   #       && new_1=$(</dev/stdin)
+   #     _is_empty "${new_1}" \
+   #       || set -- "${new_1}" "${@:1:2}"
+   ########################################
+   # e.g.
+   # echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
+   #  or
+   # echo "Hello World" |
+   # tee >(_logger [log [source]]) >(_is_not_tty && _pia_notify [displaytime [image]]) >/dev/null
    #
   #
   # get file creation time 
@@ -37,13 +41,12 @@
       # e.g. echo "Hello World" | tee >(_logger [log [source]]) >/dev/null
       # wait for stdin
         sleep 0.01
-        if read -t 0
       # there is something in stdin put it in ${@:1}
-        then read -r new_one
-             [[ -n "${new_one}" ]] \
-               && set -- "${new_one}" "${@:1:2}"
-        fi
-      #
+        read -t 0 \
+          && new_1=$(</dev/stdin)
+
+        _is_empty "${new_1}" \
+          || set -- "${new_1}" "${@:1:2}"
       #
         message="${1:-lorem ipsum dolor sit amet}"
         log="${2:-$LOG}"
@@ -52,14 +55,14 @@
         source="${3:-$(caller)}"
         tab=$((${#source}+1))
         IFS="" spaces="$(printf "%$((tab*2))s")"
-        TZ="$( awk -F, 'END {print $1}' < <(strings /etc/localtime))"
-        date="$(TZ="${TZ}" /opt/bin/date)"
+        mapfile -t TZ < <(strings /etc/localtime)
+        date="$(TZ="${TZ[-1]%%,*}" /opt/bin/date)"
 
       # running non-interactively but not from systemd: print to stdout and $log
         _is_unset PRE_UP_RUN \
-        && \
+          &&
         printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}" \
-        ||
+          ||
         echo "${message}"
       # send message to stdout
            # cat to systemd journal
@@ -73,8 +76,8 @@
         /usr/bin/awk -F"[,:}]" \
                      '{for(i=1;i<=NF;i++)
                       {if($i~/'"${key}"'\042/)
-                         {print $(i+1)}}}' \
-                   | tr -d '"'
+                         {print $(i+1)}}}' |
+                    tr -d '"'
  }
   export -f _parse_JSON
 
@@ -91,27 +94,27 @@
       # e.g. echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
       # wait for stdin
         sleep 0.01
-        if read -t 0
       # there is something in stdin put it in ${@:1}
-        then read -r new_one
-             [[ -n "${new_one}" ]] \
-               && set -- "${new_one}" "${@:1:2}"
-        fi
+        read -t 0 \
+          && new_1=$(</dev/stdin)
+
+        _is_empty "${new_1}" \
+          || set -- "${new_1}" "${@:1:2}"
         #
-        #
-        message="${1:-lorem ipsum dolor sit amet}"
+        message="$(sed -z 's/\n/\\n/g;s/\t/\\t/g' <<< "${1:-lorem ipsum dolor sit amet}")"
+      # replace newlines w/ $'\n' tabs 2/ $'\t'
         displaytime="${2:-5000}"
       # set default image file name
         image="${3:-"pia_on_48x48.png"}"
       # assume ./kodi_assets, and all scripts set working directory
         image_path="$(pwd)/kodi_assets"
         [[ -s "${image_path}/${image}" ]] \
-           && show_image=',"image":"'"${image_path}/${image}"'"'
+          && show_image=',"image":"'"${image_path}/${image}"'"'
 
         status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${show_image}"' }, "id": 1} '))"
 
         [[ "$status" =~ OK ]] \
-        || return 1
+          || return 1
         return 0
  }
   export -f _pia_notify
@@ -119,7 +122,7 @@
   # epoch creation time of file
     function _created() {
         /opt/bin/stat -c %Y "${1}" 2>/dev/null \
-                 || \
+                  ||
                  echo $?
         return 0
  }
@@ -130,8 +133,8 @@
         local now 'then'
         then="${1:-1}"
     
-        now="$(printf '%(%s)T' \
-                    | tee "${2:-/dev/null}")"
+        now="$(printf '%(%s)T' |
+               tee "${2:-/dev/null}")"
         echo -n "$((now-${then}))"
     return 0
  }
@@ -174,8 +177,8 @@
     function _print_connection_instructions() {
         
         if _is_tty
-      # running interactively
         then
+      # running interactively
              echo -e "to connect manually go to"
              echo -e "\tSettings > Coreelec > Connections, select WireGuard and connect"
              echo -e "\t    This may not set DNS and"
@@ -196,19 +199,17 @@
              echo
         else
       # running non-interactively, log and Gui.Notifications
-        # two lines that require scrolling really mess up estuary etc.
-        # and some skins don't scroll and limit the number of lines
              echo 'Saved configuration for '"${REGION_NAME}"' ' |
-              tee >(_logger) >(_pia_notify)
-             sleep 5
+              tee >(_logger) >(_pia_notify) >/dev/null
+             sleep 3
              echo "Goto Settings>Coreelec>Connections" |
-              tee >(_logger) >(_pia_notify 10000 )
+              tee >(_logger) >(_pia_notify 10000 ) >/dev/null
              sleep 10
              echo "This precludes port forwarding and setting a safe firewall" |
-              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png')
+              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png') >/dev/null
              sleep 6
              echo "Set CONNMAN_CONNECT=true to avoid this" |
-              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png')
+              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png') >/dev/null
              sleep 6
         fi
     return 0

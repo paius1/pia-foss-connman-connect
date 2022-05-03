@@ -67,7 +67,7 @@
 
        # filename containing wg0's region name
          wg_0_file="$(grep -l --exclude='~$' "${wg_0##*_}" ~/.config/wireguard/*.config)"
-         [[ "$(<${wg_0_file})" =~ Name.*\[(.*)\] ]]
+         [[ "$(<"${wg_0_file}")" =~ Name.*\[(.*)\] ]]
          REGION_NAME="${BASH_REMATCH[1]:-}"
 
        # GUI notification
@@ -82,7 +82,7 @@
     fi
 
   # Can I reach the interwebs
-    if ! ping -c 1  -W 1  -q 208.67. 222.222 > /dev/null 2>&1
+    if ! ping -c 1  -W 1  -q 208.67.222.222 > /dev/null 2>&1
   # No # Note to self $MY_FIREWALL is passed to this script by run_setup.sh
     then iptables-restore < "${MY_FIREWALL:=openrules.v4}"
          _logger "restored ${MY_FIREWALL} firewall"
@@ -104,7 +104,7 @@
        # or create a new resolv.conf from connman settings
             # already have array of services  
             # get nameserver from first active non vpn_ interface
-              non_vpn=($( printf '%s\n' "${services[@]}" | grep -v 'vpn_' ))
+              non_vpn=("$( printf '%s\n' "${services[@]}" | grep -v 'vpn_' )")
               mapfile -d ' ' NS < <(awk -F'[=|;]' '/^Nameserver/{printf "%s", $2}' ~/.cache/connman/"${non_vpn[0]##* }"/settings)
             # or fall back to opendns
 
@@ -138,7 +138,7 @@ EOF
     then 
   # stop port forwarding 
          echo "${pf_pids[@]}" |
-         xargs -d $'\n' sh -c 'for pid do kill $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
+         xargs -d $'\n' sh -c 'for pid do kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
          _logger "Stopped port forwarding"
        # clear the log file ?
          :> /tmp/port_forward.log

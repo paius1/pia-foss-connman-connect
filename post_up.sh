@@ -1,8 +1,15 @@
 #!/opt/bin/bash
 #    v 0.0.1, c plgroves gmail 2022
-#    SCRIPTNAME called by PATH/connect_to_wireguard_with_token.sh
+#    SCRIPTNAME called by systemd ExecStartPost
+#               or PATH/connect_to_wireguard_with_token.sh,
+#               when run from favourites or tty
 #        
-#        put commands here to run after vpn is up
+#        SCRIPTNAME is misleading as this actually bring the tunnel up
+#                   allowing for reuse of valid pia.config files
+#        1st check autoconnect|connman_connect
+#        setup DNS
+#        start up port_forwarding
+#        append commands here to run after vpn is up
 #        
 #         e.g. transmission
 #        
@@ -29,25 +36,40 @@
 #exec > >(tee -a $LOG) #2>&1
 
   # by moving actual connection out of connect_to_w...sh
-  # we lost $AUTOCONNECT $SERVICE, $REGION_NAME, etc.
-    source .env 2>/dev/null
-    AUTOCONNECT="${:-false}"
+  # we lose $AUTOCONNECT etal, $SERVICE, $REGION_NAME, etc.
+
+    function check_vars() { # https://stackoverflow.com/users/6590128/bromate
+        local var_names=("$@")
+        
+        echo -n "SET "
+            for var_name in "${var_names[@]}"
+            do  if _is_empty "${!var_name}"
+                then eval "$(awk '/'"${var_name}"'=/ {print}' .env)"
+                     echo -n "${var_name}=${!var_name} "
+                fi
+            done
+        echo "from .env file"
+ }
+
+  # variables set in normal run_setup.sh call
+    check_vars AUTOCONNECT PIA_PF PIA_DNS
+    
+    AUTOCONNECT="${AUTOCONNECT:-false}"
     PIA_PF="${PIA_PF:-false}"
     PIA_DNS="${PIA_DNS:-true}"
 
-  # WG_SERVER_IP=$Host=WG_SERVER_IP WG_HOSTNAME=$Domain=PF_HOSTNAME DNS=$WireGuard_DNS
-  # from ~/.config/wireguard/pia${cli}.config (cli is passed when _is_tty)
+  # variables set in normal connect_to_w...sh call
+  # from /storage/.config/wireguard/pia${cli}.config (cli is passed when _is_tty)
+  # WG_SERVER_IP = ${Host//_/.} = PF_GATEWAY  WG_HOSTNAME = $Domain = PF_HOSTNAME DNS = $WireGuard_DNS
+    declare Host Domain Name WireGuard_DNS
     eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia"${cli}".config |
-            sed 's/\./_/g;s/ = \(.*\)$/="\1"/g')"
-
-    mapfile -t tokenFile < /opt/etc/piavpn-manual/token
-    PIA_TOKEN="${tokenFile[0]}"
-    WG_SERVER_IP="${Host}"
-    WG_HOSTNAME="${Domain}"
+            sed 's/\./_/;s/ = \(.*\)$/="\1"/g')"
+          # replace dots with _'s for variable names, spills over to dot.URL
 
     SERVICE="vpn_${Host//./_}${Domain/#/_}"
     [[ "${Name}" =~ \[(.*)\] ]]
     REGION_NAME="${BASH_REMATCH[1]:-}"
+    WireGuard_DNS="${WireGuard_DNS//_/.}"
 
   # post_up.sh is kind of a misnomer
     if [[ ! "${CONNMAN_CONNECT}" =~ ^[t|T] ]] \
@@ -57,7 +79,8 @@
   # both systemd and the user don't want to connect
          echo 'AUTOCONNECT='"${AUTOCONNECT}"' CONNMAN_CONNECT='"${CONNMAN_CONNECT}"'' |
          tee >( _logger ) >( _is_not_tty && _pia_notify 6000 'pia_off_48x48.png' ) >/dev/null
-           sleep 6
+           _is_not_tty \
+           && sleep 6
 
          _print_connection_instructions
          exit 0
@@ -83,14 +106,14 @@
               echo 
          else
        # or not #
-              echo 'Successfully connected to '"${REGION_NAME}"' ' |
+              echo 'Connected to '"${REGION_NAME}"' ' |
               tee >(_logger ) >(_pia_notify 5000 'pia_on_48x48.png' ) >/dev/null #
               sleep 3 # for notification
          fi
     else
   # FAILURE
          echo 'CONNMAN failed to connect to '"${REGION_NAME}"'!' |
-         tee >( _logger ) >( _is_not_tty _pia_notify 10000 'pia_off_48x48.png' ) >/dev/null
+         tee >( _logger ) >( _is_not_tty && _pia_notify 10000 'pia_off_48x48.png' ) >/dev/null
          exit 255
     fi
 
@@ -107,8 +130,10 @@
          fi
        # https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
          #DNS_SERVER="$(./dnsleaktest.py | awk -F"by" ' /by/{print $2; exit}')"
-         #_pia_notify 'DNS server is '"${DNS_SERVER}"' ' 10000; sleep 9
-    fi #
+         #echo  'DNS server is '"${DNS_SERVER}"' ' |
+         #tee >(_logger) >(_is_not_tty && _pia_notify) >/dev/null
+         #sleep 3
+    fi
 
   # the command for port forwarding was saved in /opt/etc/piavpn-manual/port_forward[-(user_added)].cmd
     if [[ $PIA_PF != "true" ]]
@@ -125,14 +150,61 @@
          echo
     else
   # Start port_forward.sh
-         echo "        logging port_forwarding.sh to /tmp/port_forward.log" #
+         tokenLocation=/opt/etc/piavpn-manual/token
 
-       # allow rest of post_up.sh to run
-         (sleep 2
-          chmod +x /opt/etc/piavpn-manual/port_forward"${cli}".cmd
-          eval /opt/etc/piavpn-manual/port_forward"${cli}".cmd > /tmp/port_forward.log
-         )&
-         disown
+         function _get_token() {
+             check_vars  PIA_USER PIA_PASS
+             if PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" "$(pwd)"/get_token.sh
+             then return 0
+             else return 1
+             fi
+         }        
+
+         if [[ -s "${tokenLocation}" ]]
+         then
+       # have tokenFile #
+    
+            # check expiry
+            # https://stackoverflow.com/users/2318662/tharrrk
+              m2n() { printf '%02d' $((-10+$(sed 's/./\U&/g;y/ABCEGLNOPRTUVY/60AC765A77ABB9/;s/./+0x&/g'<<<${1#?}) ));}
+     
+              mapfile -t tokenFile < "${tokenLocation}"
+            # 2 steps with builtins vs. awk
+              month="${tokenFile[1]#* }"; month="${month%% *}"; month="$(m2n "${month}")"
+              expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenFile[1]}"))"
+
+            # compare iso dates
+              if (( $(date -d "+30 min" +%s) < $(date -d "${expiry_iso}" +%s) ))
+              then echo "Previous token OK!"
+            # less than 24hrs old
+
+              else echo "token expired saving a new one to ${tokenLocation}"
+            # day old, refresh 
+                   _get_token \
+                   && mapfile -t tokenFile < "${tokenLocation}"
+              fi
+
+         else 
+       # get tokenFile
+              _get_token \
+              && mapfile -t tokenFile < "${tokenLocation}"
+         fi
+
+         if [[ -n "${tokenFile[0]}" ]]
+         then echo "    logging port_forwarding${cli}.cmd to /tmp/port_forward.log"
+       # have token, proceed with ./port_forwarding.sh
+
+            # refresh PIA_TOKEN in port_forward.cmd
+              sed -i.bak "s|PIA_TOKEN=.* \(PF_G.*\)|PIA_TOKEN=${tokenFile[0]} \1|" /opt/etc/piavpn-manual/port_forward"${cli}".cmd
+
+            # allow post_up.sh to continue
+              ( sleep 2
+                source /opt/etc/piavpn-manual/port_forward"${cli}".cmd >> /tmp/port_forward.log 2>&1
+              )& >/dev/null
+              disown
+         else echo "Failed to get a valid token"
+              PIA_PF=false
+         fi
     fi #
 
 #########################################################
@@ -141,7 +213,7 @@
 #########################################################
     up="$(</proc/uptime)"
     if [[ "${up%%.*}" -lt 60 ]]
-    then _logger "taking 3"
+    then #_logger "taking 3"
   # SYSTEM START, wait and load ip_tables module
          #sleep 3
 
@@ -153,7 +225,7 @@
          fi
 
          [[ "$(lsmod)" =~ ip_tables[[:blank:]] ]] \
-           && _logger "ip_tables module loaded"
+           && _logger "${BASH_REMATCH[0]} module loaded"
     fi
 
   # Iptables-restore vpn killswitch #

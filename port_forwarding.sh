@@ -96,14 +96,14 @@ fi
     fatal_error () { #
         local port="${1}" #
         echo "Fatal error::port_forwarding.sh" |
-        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png' #
+        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') #
          sleep 10 #
 
       # remove port from iptables #
         iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
 
         echo "Attempting restart of port forwarding" |
-        tee >(_logger) >(_pia_notify 5000 'pia_off_48x48.png' #
+        tee >(_logger) >(_pia_notify 5000 'pia_off_48x48.png') #
         sleep 15 #
     
         PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$PF_GATEWAY PF_HOSTNAME=$PF_HOSTNAME \
@@ -114,11 +114,13 @@ fi
   # Handle shutdown behavior
     finish () { #
         echo "Port forward rebinding stopped. The port will likely close soon." |
-        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png' #
+        tee >(_logger) \
+            >(systemctl --quiet is-active  pia-wireguard.service && _pia_notify 5000 'pia_off_48x48.png' ) >/dev/null #
         #_logger "Port forward rebinding stopped. The port will likely close soon." #
 
       # remove port from iptables #
-        iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
+        iptables -C INPUT -p tcp --dport "${port}" -j ACCEPT 2>/dev/null \
+           && iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
 
         exit 0 #
  }
@@ -138,14 +140,14 @@ fi
             fi #
          done #
          echo "${pf_pids[@]}" |
-         xargs -d $'\n' sh -c 'for pid do kill $pid 2>/dev/null; wait $pid 2>/dev/null; done' _ #
+         xargs -d $'\n' sh -c 'for pid do kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null; done' _ #
     fi #
 
   # wait for privateinternetaccess this could be an infinite loop #
     until ping -c 1 -W 1  privateinternetaccess.com > /dev/null 2>&1 #
     do _logger "wait for privateinternetaccess" #
        sleep 5 #
-       connmanctl connect "${SERVICE}" || exit 0 #
+       #connmanctl connect "${SERVICE}" || exit 0 #
        # maybe create a time out #
        # or just exit #
     done #
@@ -223,11 +225,11 @@ expires_at=$(echo "$payload" | base64 -d | jq -r '.expires_at')
   # Dump port to file if requested #
          [[ -n "$portfile" ]] \
            && { echo "${port}" > "$portfile" \
-                && _logger "Port dumped to $portfile"; } #
+                && _logger "Port ${port} dumped to $portfile"; } #
 
        # add port to iptables #
          iptables -I INPUT -p tcp --dport "${port}" -j ACCEPT #
-         _logger "added peer port ${port} to firewall" #
+         _logger "added port ${port} to firewall" #
 
 >&2 echo -ne "
 --> The port is ${green}$port${nc} and it will expire on ${red}$expires_at${nc}. <--
@@ -266,7 +268,7 @@ while true; do
          _logger "Expires at        $(date --date="$expires_at")" #
          _logger "${BASH_SOURCE##*/} must remain active to use port forwarding," #
          _logger "and will refresh every 15 minutes." #
-    else _logger "Rebinding to peer port ${port} @ $(date +'%I:%M:%S %D')" #
+    else _logger "Rebinding to port ${port} @ $(date +'%I:%M:%S %D')" #
     fi #
 
     # sleep 15 minutes
