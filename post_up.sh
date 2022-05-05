@@ -15,6 +15,7 @@
 #        
 ####
 # 
+
     _Usage() {
          sed >&2 -n "1d; /^###/q; /^#/!q; s/^#*//; s/^ //; 
                      s!PATH!$(pwd)!; s/SCRIPTNAME/${BASH_SOURCE##*/}/; p" \
@@ -60,7 +61,6 @@
 
   # variables set in normal connect_to_w...sh call
   # from /storage/.config/wireguard/pia${cli}.config (cli is passed when _is_tty)
-  # WG_SERVER_IP = ${Host//_/.} = PF_GATEWAY  WG_HOSTNAME = $Domain = PF_HOSTNAME DNS = $WireGuard_DNS
     declare Host Domain Name WireGuard_DNS
     eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia"${cli}".config |
             sed 's/\./_/;s/ = \(.*\)$/="\1"/g')"
@@ -90,8 +90,30 @@
     if [[ "${PRE_UP_RUN}" != 'true' ]]
     then >&2 _logger "Finishing up ..."; fi
 
+# PIA currently does not support IPv6. In order to be sure your VPN
+# connection does not leak, it is best to disabled IPv6 altogether.
+# IPv6 can also be disabled via kernel commandline param, so we must
+# first check if this is the case.
+    if [[ -f /proc/net/if_inet6 ]] \
+         &&
+       [[ $(sysctl -n net.ipv6.conf.all.disable_ipv6) -ne 1 ||
+          $(sysctl -n net.ipv6.conf.default.disable_ipv6) -ne 1 ]]
+    then sysctl -w net.ipv6.conf.all.disable_ipv6=1
+         sysctl -w net.ipv6.conf.default.disable_ipv6=1
+    fi
+
   # Connect with connmanctl
-    if connmanctl connect "${SERVICE}"
+    until [[ -n "${wg_0:=${BASH_REMATCH[1]}}" ]]
+    do connmanctl connect "${SERVICE}"
+       ((n++)) 
+
+       [[ "${n}" -ge 5 ]] && break
+       sleep 1
+       readarray -t services < <(connmanctl services)
+       [[ "${services[0]}" =~ (vpn_.*)$ ]]
+done
+
+    if [[ "${n}" -lt 5 ]]
     then
   # SUCCESS
          if _is_tty
@@ -128,11 +150,14 @@
               /run/connman/resolv.conf
               echo
          fi
-       # https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
-         #DNS_SERVER="$(./dnsleaktest.py | awk -F"by" ' /by/{print $2; exit}')"
-         #echo  'DNS server is '"${DNS_SERVER}"' ' |
-         #tee >(_logger) >(_is_not_tty && _pia_notify) >/dev/null
-         #sleep 3
+       ## https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
+         #up="$(</proc/uptime)"
+         #if [[ "${up%%.*}" -gt 120 ]]
+         #then DNS_SERVER="$(_parse_JSON 'city' < <(./dnsleaktest.py -j ))"
+              #echo  "DNS server is in ${DNS_SERVER}" |
+              #tee >(_logger) >(_is_not_tty && _pia_notify) >/dev/null
+              #sleep 3
+         #fi
     fi
 
   # the command for port forwarding was saved in /opt/etc/piavpn-manual/port_forward[-(user_added)].cmd
@@ -150,8 +175,8 @@
          echo
     else
   # Start port_forward.sh
-         tokenLocation=/opt/etc/piavpn-manual/token
 
+         tokenLocation=/opt/etc/piavpn-manual/token
          function _get_token() {
              check_vars  PIA_USER PIA_PASS
              if PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" "$(pwd)"/get_token.sh
@@ -163,11 +188,11 @@
          if [[ -s "${tokenLocation}" ]]
          then
        # have tokenFile #
-    
+
             # check expiry
             # https://stackoverflow.com/users/2318662/tharrrk
               m2n() { printf '%02d' $((-10+$(sed 's/./\U&/g;y/ABCEGLNOPRTUVY/60AC765A77ABB9/;s/./+0x&/g'<<<${1#?}) ));}
-     
+
               mapfile -t tokenFile < "${tokenLocation}"
             # 2 steps with builtins vs. awk
               month="${tokenFile[1]#* }"; month="${month%% *}"; month="$(m2n "${month}")"
@@ -181,18 +206,19 @@
               else echo "token expired saving a new one to ${tokenLocation}"
             # day old, refresh 
                    _get_token \
-                   && mapfile -t tokenFile < "${tokenLocation}"
+                      && mapfile -t tokenFile < "${tokenLocation}"
               fi
 
          else 
        # get tokenFile
               _get_token \
-              && mapfile -t tokenFile < "${tokenLocation}"
+                 && mapfile -t tokenFile < "${tokenLocation}"
          fi
 
          if [[ -n "${tokenFile[0]}" ]]
-         then echo "    logging port_forwarding${cli}.cmd to /tmp/port_forward.log"
+         then echo "    logging port_forwarding${cli}.cmd to /tmp/port_forward.log" |
        # have token, proceed with ./port_forwarding.sh
+              tee >(_logger) >/dev/null
 
             # refresh PIA_TOKEN in port_forward.cmd
               sed -i.bak "s|PIA_TOKEN=.* \(PF_G.*\)|PIA_TOKEN=${tokenFile[0]} \1|" /opt/etc/piavpn-manual/port_forward"${cli}".cmd
@@ -214,7 +240,7 @@
     up="$(</proc/uptime)"
     if [[ "${up%%.*}" -lt 60 ]]
     then #_logger "taking 3"
-  # SYSTEM START, wait and load ip_tables module
+  # SYSTEM START, wait and load ip_tables module if required
          #sleep 3
 
          if [[ ! "$(lsmod)" =~ ip_tables[[:blank:]] ]]

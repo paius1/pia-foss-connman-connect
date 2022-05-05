@@ -313,7 +313,7 @@ if [[ -z $PIA_TOKEN ]]; then
 # dont delete, can reuse for 24 hours #
 #rm -f /opt/etc/piavpn-manual/token #
 else
-  echo -e "Using existing token ${green}$PIA_TOKEN${nc}." #
+  echo -e "Using existing token ${green}\$PIA_TOKEN${nc}." #
   echo
 fi
 

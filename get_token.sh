@@ -127,13 +127,13 @@ token=$(echo "$generateTokenResponse" | /opt/bin/jq -r '.token') #
 tokenExpiration=$(timeout_timestamp)
 tokenLocation=/opt/etc/piavpn-manual/token
 
-     #if _is_tty #
+     if _is_tty #
    # Running interactively #
-     #then #
+     then #
           echo -e "PIA_TOKEN=$token${nc}"
           echo #
           echo "This token will expire in 24 hours, on $tokenExpiration." #
           echo #
-     #fi #
+     fi #
           echo "$token" > "$tokenLocation" || exit 1 #
           echo "$tokenExpiration" >> "$tokenLocation" #

@@ -3,30 +3,31 @@
 # pia-foss-wireguard kodi functions
 
   # add kodi GUI.Notifications with timeouts and images
-  #     _pia_notify 'message' 'display time' 'image file'
+  #     _pia_notify 'message' ['display time' ['image file']]
   # logging function
-  #     _logger 'message' 'logfile' 'calling script'
+  #     _logger 'message' ['logfile' ['calling script']]
+  #
+  # return file creation time
+  # return interval now-then
+  # return seconds as 'X hrs Y mins Z secs'
+  # test for empty/unset variables n.b. test unset passes VARIABLE NAME
+  # test if called interactively or not
+  # display connection steps to GUI or tty
   # 
-   ##This section #################################
-   #        sleep 0.01
+   ##This section in _logger _pia_notify ##
+   ## wait for stdin from a pipe
+   #        sleep 0.01 
    #        read -t 0 \
-   #          && new_1=$(</dev/stdin)
+   #           && new_1=$(</dev/stdin)
    #        _is_empty "${new_1}" \
-   #          || set -- "${new_1}" "${@:1:2}"
-   ################### allows reading from a tee ##
+   #           || set -- "${new_1}" "${@:1:2}"
+   ######################################## allows reading from a tee ##
    # e.g.
    # echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
    #  or
    # echo "Hello World" |
    # tee >(_logger [log [source]]) >(_is_not_tty && _pia_notify [displaytime [image]]) >/dev/null
    #################################################
-  #
-  # get file creation time 
-  # check interval now-then
-  # convert seconds to 'X hrs Y mins Z secs'
-  # check for empty/unset variables n.b. test unset passes VARIABLE NAME ONLY
-  # run is interactive or not
-  # display connection steps to screen or tty
 
   # credentials for local kodi
     kodi_user=kodi
@@ -40,28 +41,40 @@
 
       # This section allows reading from a tee
       # e.g. echo "Hello World" | tee >(_logger [log [source]]) >/dev/null
-      # wait for stdin
+      # wait for stdin from a pipe
         sleep 0.01
+
       # there is something in stdin put it in ${@:1}
         read -t 0 \
-          && new_1=$(</dev/stdin)
+           && new_1="$(cat </dev/stdin & wait)"
+           #&& new_1=$(</dev/stdin)
 
+      # append to parameters
         _is_empty "${new_1}" \
-          || set -- "${new_1}" "${@:1:2}"
+           || set -- "${new_1}" "${@:1:2}"
       #
         message="${1:-lorem ipsum dolor sit amet}"
-        log="${2:-$LOG}"
+      # remove ANSI escape sequences
+        message="$(sed -e 's/\x1b\[[0-9;]*m//g' <<< "${message}")"
+
       # in case $LOG is not set
+        log="${2:-$LOG}"
         log="${log:-/dev/null}"
+
+      # message sender
         source="${3:-$(caller)}"
+
+      # align messages
         tab=$((${#source}+1))
         IFS="" spaces="$(printf "%$((tab*2))s")"
+
+      # proper timestamps
         mapfile -t TZ < <(strings /etc/localtime)
         date="$(TZ="${TZ[-1]%%,*}" /opt/bin/date)"
 
       # running non-interactively but not from systemd: print to stdout and $log
         _is_unset PRE_UP_RUN \
-          &&
+           &&
         printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}" \
           ||
         echo "${message}"
@@ -93,22 +106,33 @@
 
       # This section allows reading from a tee
       # e.g. echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
-      # wait for stdin
-        sleep 0.01
-      # there is something in stdin put it in ${@:1}
-        read -t 0 \
-          && new_1=$(</dev/stdin)
+      # wait for stdin from a pipe
+        #sleep 0.01
 
-        _is_empty "${new_1}" \
-          || set -- "${new_1}" "${@:1:2}"
-        #
-        message="$(sed -z 's/\n/\\n/g;s/\t/\\t/g' <<< "${1:-lorem ipsum dolor sit amet}")"
-      # replace newlines w/ $'\n' tabs 2/ $'\t'
+      # there is something in stdin put it in ${@:1}
+        if test ! -t 0; then
+            set -- "$(cat <&0 & wait)" "${@:1:2}"
+        fi
+
+      # only last line of multi line messages
+        message="$(sed -n '$p' <<< "${1:-lorem ipsum dolor sit amet}")"
+
+      # escape newlines and tabs
+        message="$(sed -z 's/\n/\\n/g;s/\t/\\t/g' <<< "${message}")"
+
+      # remove ANSI escape sequences
+        message="$(sed -e 's/\x1b\[[0-9;]*m//g' <<< "${message}")"
+
+      # default kodi displaytime 5 seconds
         displaytime="${2:-5000}"
+
       # set default image file name
         image="${3:-"pia_on_48x48.png"}"
+
       # assume ./kodi_assets, and all scripts set working directory
         image_path="$(pwd)/kodi_assets"
+
+      # add image to json
         [[ -s "${image_path}/${image}" ]] \
           && show_image=',"image":"'"${image_path}/${image}"'"'
 
@@ -201,16 +225,16 @@
         else
       # running non-interactively, log and Gui.Notifications
              echo 'Saved configuration for '"${REGION_NAME}"' ' |
-              tee >(_logger) >(_pia_notify) >/dev/null
+              tee >(_logger; exit) >(_pia_notify; exit) >/dev/null
              sleep 3
              echo "Goto Settings>Coreelec>Connections" |
-              tee >(_logger) >(_pia_notify 10000 ) >/dev/null
+              tee >(_logger; exit) >(_pia_notify 10000; exit ) >/dev/null
              sleep 10
              echo "This precludes port forwarding and setting a safe firewall" |
-              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png') >/dev/null
-             sleep 6
+              tee >(_logger; exit) >(_pia_notify 6000 'pia_off_48x48.png'; exit) >/dev/null
+             sleep 7
              echo "Set CONNMAN_CONNECT=true to avoid this" |
-              tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png') >/dev/null
+              tee >(_logger; exit) >(_pia_notify 6000 'pia_off_48x48.png'; exit) >/dev/null
              sleep 6
         fi
     return 0

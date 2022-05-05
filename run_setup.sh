@@ -74,10 +74,10 @@
   # not called by systemd or interactively, and systemd service exists #
          systemd-cat -t pia-wireguard.favourites -p notice \
                     <<< "(Re)starting pia-wireguard.service from outside of systemd" #
-       # log this to systemd journal and pia-wireguard log #
-         LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' #
-         # optional Gui notificaton #
-           #_pia_notify 'Called outside of systemd service is '" $(systemctl is-active  pia-wireguard.service)"'' ; sleep 5 #
+       # log this to systemd journal and pia-wireguard log (n.b wait for command #
+         LOG=/tmp/pia-wireguard.log echo 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' | #
+         tee >( sleep 0.01; _logger) >(_is_not_tty && _pia_notify ) >/dev/null; sleep 5 #
+                                     # optional Gui notificaton #
 
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
          in #
@@ -170,8 +170,11 @@
     then echo "Get ready to rumble" #
   # run is interactive w/o a .env file #
 
-    else _pia_notify "No valid PIA config -> $(pwd)/.env" 10000 'pia_off_48x48.png' #
+    else echo "No valid PIA config -> $(pwd)/.env" |
   # fail without minimal .env file #
+         tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') #
+
+         sleep 10
          _pia_notify "CONNECTION FAILED" 100000 #
          exit 1 #
     fi #
@@ -182,7 +185,7 @@
          &&
        [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
     then _logger "    Checking current .env file with previous" #
-  # not running interactively, have checksum for previous .env #
+  # not running interactively, have checksum for .env #
 
          if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
          then _logger "    .env is unchanged" #
@@ -190,7 +193,7 @@
               age_pia_config="$(_interval "$(_created /storage/.config/wireguard/pia.config)")" #
 
               if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
-              then _logger "    pia.config is $(_hmmss "${age_pia_config}") old" #
+              then _logger "    pia.config last connected $(_hmmss "${age_pia_config}") ago" #
             # wireguard/pia.config is less that 24 hours old   #
 
                    case "${PRE_UP_RUN}" #
@@ -202,6 +205,7 @@
                    esac #
               else _logger "Need fresh pia.config" #
             # day old config #
+                   rm -v /opt/etc/wireguard/pia.conf
                    rm -v /storage/.config/wireguard/pia.config
               fi #
 
@@ -233,7 +237,8 @@
          if _is_empty "${PIA_USER}" \
              || 
             _is_empty "${PIA_PASS}" #
-         then _pia_notify "Missing PIA Credentials" "${BOTHER}" #
+         then echo  "Missing PIA Credentials" |
+              tee >(_logger) >(_pia_notify "${BOTHER}") #
        # NO CREDENTIALS, we can forgetabout it #
               sleep "$((BOTHER/1000+1))" #
               _pia_notify "CONNECTION FAILED" "$((BOTHER-5000))"#
@@ -252,10 +257,12 @@
          then #
        # Set them #
               function _AUTOCONNECT_or_PREFERRED_REGION() { #
-            # AUTOCONNECT=true negates PREFERRED_REGION #
+
                   if [[ "${AUTOCONNECT}" =~ ^t ]] #
-                  then echo "the fastest server" #
-                       _pia_notify 'AUTOCONNECT=true OVERRIDES PREFERRED_REGION='"${PREFERRED_REGION}"'' "$((BOTHER/2))" #
+                  then echo "AUTOCONNECT=true OVERRIDES PREFERRED_REGION=${PREFERRED_REGION}"|
+                # AUTOCONNECT=true negates PREFERRED_REGION #
+                       tee >(_logger) >(_pia_notify "$((BOTHER/2))") >/dev/null #
+                       echo "the fastest server" #
                        sleep "$((BOTHER/2000))" #
                   else echo "${PREFERRED_REGION}" #
                   fi #
@@ -287,12 +294,15 @@
          PIA_PF="${PIA_PF:-false}" #
 
          if _is_empty "${PIA_DNS}" #
-         then _pia_notify "FORCED PIA DNS"; sleep 2 #
+         then echo "FORCED PIA DNS" |
+              tee >(_logger) >(_pia_notify) >/dev/null #
+              sleep 2 #
        # force PIA_DNS=true
               export PIA_DNS='true' #
          fi #
 
-         _pia_notify 'getting details for '"${via}"'' #
+         echo 'getting details for '"${via}"'' |
+         tee >(_logger) >(_pia_notify) >/dev/null #
     fi #
 
   # PRE_UP_RUN has been set true by systemd, or 'cli' if _is_tty #
@@ -456,7 +466,8 @@ ${green}Defaulting to yes.${nc}
   echo "sysctl -w net.ipv6.conf.all.disable_ipv6=0"
   echo "sysctl -w net.ipv6.conf.default.disable_ipv6=0"
   echo -e "${nc}"
-     else _pia_notify "IPv6 has been disabled" #
+     else echo "IPv6 has been disabled" |
+          tee >(_logger) >(_pia_notify) >/dev/null #
      fi #
   sysctl -w net.ipv6.conf.all.disable_ipv6=1
   sysctl -w net.ipv6.conf.default.disable_ipv6=1
@@ -617,15 +628,15 @@ For example, you can try 0.2 for 200ms allowed latency.
                      PREFERRED_REGION=$( awk 'NR == 1 {print $2}' /opt/etc/piavpn-manual/latencyList ) # 
                      REGION="$(/opt/bin/jq -r '.name' < /opt/etc/piavpn-manual/regionData )" #
                      export PREFERRED_REGION #
-                     _pia_notify 'Selected for '"${REGION}"'' #
+                     echo 'Selected for '"${REGION}"'' |
+                     tee >(_logger) >(_pia_notify) >/dev/null #
                 fi #
       else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
 
            if _is_not_tty #
          # RUNNING NON-INTERACTIVELY #
-           then #
-                _pia_notify "No Available Servers Found!" "${BOTHER}" #
-                _logger "No Available Servers Found!" #
+           then echo "No Available Servers Found!" |
+                tee >(_logger) >(_pia_notify "${BOTHER}") >/dev/null #
            fi #
         exit 1
       fi
