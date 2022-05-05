@@ -43,11 +43,11 @@
   #     _pia_notify 'message' 'display time' 'image file' #
   # and logging #
   #     _logger 'message' [ logfile ] #
-  # get file creation time 
-  # check interval now - then
-  # convert seconds to 'X hrs Y mins Z secs'
-  # check for empty/unset variables n.b. test unset passes VARIABLE NAME ONLY
-  # check is interactive or not
+  # get file creation time #
+  # check interval now - then #
+  # convert seconds to 'X hrs Y mins Z secs' #
+  # check for empty/unset variables n.b. test unset passes VARIABLE NAME ONLY #
+  # check is interactive or not #
   #
     [ -z "${kodi_user}" ] \
     && source ./kodi_assets/functions #
@@ -74,9 +74,9 @@
   # not called by systemd or interactively, and systemd service exists #
          systemd-cat -t pia-wireguard.favourites -p notice \
                     <<< "(Re)starting pia-wireguard.service from outside of systemd" #
-       # log this to systemd journal and pia-wireguard log (n.b wait for command #
+       # log this to systemd journal and pia-wireguard log (n.b wait for command) #
          LOG=/tmp/pia-wireguard.log echo 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' | #
-         tee >( sleep 0.01; _logger) >(_is_not_tty && _pia_notify ) >/dev/null; sleep 5 #
+         tee >( sleep 0.01; _logger) #>(_is_not_tty && _pia_notify ) >/dev/null; sleep 5 #
                                      # optional Gui notificaton #
 
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
@@ -172,7 +172,7 @@
 
     else echo "No valid PIA config -> $(pwd)/.env" |
   # fail without minimal .env file #
-         tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') #
+         tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') >/dev/null #
 
          sleep 10
          _pia_notify "CONNECTION FAILED" 100000 #
@@ -235,11 +235,11 @@
 
        # Check credentials #
          if _is_empty "${PIA_USER}" \
-             || 
+              || 
             _is_empty "${PIA_PASS}" #
          then echo  "Missing PIA Credentials" |
-              tee >(_logger) >(_pia_notify "${BOTHER}") #
        # NO CREDENTIALS, we can forgetabout it #
+              tee >(_logger) >(_pia_notify "${BOTHER}") >/dev/null #
               sleep "$((BOTHER/1000+1))" #
               _pia_notify "CONNECTION FAILED" "$((BOTHER-5000))"#
               exit 1 #
@@ -249,41 +249,26 @@
        # AUTOCONNECT|CONNMAN_CONNECT = false|null requires using Settings > CoreELEC > Connections #
        #   and sets NO FIREWALL or port forwarding #
 
-         if _is_empty "${PREFERRED_REGION}" \
-             || 
-            _is_empty "${AUTOCONNECT}" \
-             || 
-            _is_empty "${MAX_LATENCY}" #
-         then #
-       # Set them #
-              function _AUTOCONNECT_or_PREFERRED_REGION() { #
+       # ensure AUTOCONNECT is set, and go from there #
+         AUTOCONNECT="${AUTOCONNECT:-false}" #
 
-                  if [[ "${AUTOCONNECT}" =~ ^t ]] #
-                  then echo "AUTOCONNECT=true OVERRIDES PREFERRED_REGION=${PREFERRED_REGION}"|
-                # AUTOCONNECT=true negates PREFERRED_REGION #
-                       tee >(_logger) >(_pia_notify "$((BOTHER/2))") >/dev/null #
-                       echo "the fastest server" #
-                       sleep "$((BOTHER/2000))" #
-                  else echo "${PREFERRED_REGION}" #
-                  fi #
-              } #
-
-            # ensure AUTOCONNECT is set, and go from there #
-              AUTOCONNECT="${AUTOCONNECT:-false}" #
-
-              if ! _is_empty "${PREFERRED_REGION}" #
-              then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
-            # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
-              else  #
-            # PREFERRED_REGION not set #
-                   [[ "${AUTOCONNECT}" =~ ^f ]] \
-                     && MAX_LATENCY="${MAX_LATENCY:=0.05}" #
-                   via="the fastest server" #
-              fi #
-         elif _is_empty "${MAX_LATENCY}" #
-         then via="$(_AUTOCONNECT_or_PREFERRED_REGION)" #
-       # RESOLVE AUTOCONNECT:PREFERRED_REGION CONFLICT #
-         fi #
+          if [[ "${AUTOCONNECT}" =~ ^[t|T] ]] #
+          then  #
+        # check PREFERRED_REGION #
+               if _is_set "${PREFERRED_REGION}" #
+               then echo "AUTOCONNECT=true OVERRIDES PREFERRED_REGION=${PREFERRED_REGION}" |
+             # AUTOCONNECT=true negates PREFERRED_REGION #
+                    tee >(_logger) >(_pia_notify "$((BOTHER/2))") >/dev/null #
+                    sleep "$((BOTHER/2000))" #
+               fi #
+               
+          elif _is_set "${PREFERRED_REGION}" #
+          then via="region: ${PREFERRED_REGION}" #
+        # easy peasy #
+    
+          else MAX_LATENCY="${MAX_LATENCY:=0.05}" #
+        # to continue non-interactively #
+          fi
 
        # BOTHER ABOUT PREFERRED_REGION='' BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
          _is_empty "${PREFERRED_REGION}" \
@@ -301,7 +286,7 @@
               export PIA_DNS='true' #
          fi #
 
-         echo 'getting details for '"${via}"'' |
+         echo 'getting details for '"${via:=the fastest server}"'' |
          tee >(_logger) >(_pia_notify) >/dev/null #
     fi #
 

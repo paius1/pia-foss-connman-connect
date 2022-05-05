@@ -16,12 +16,12 @@
   # 
    ##This section in _logger _pia_notify ##
    ## wait for stdin from a pipe
-   #        sleep 0.01 
-   #        read -t 0 \
-   #           && new_1=$(</dev/stdin)
-   #        _is_empty "${new_1}" \
-   #           || set -- "${new_1}" "${@:1:2}"
-   ######################################## allows reading from a tee ##
+   #  sleep 0.01 
+   #  read -t 0 \
+   #    && new_1=$(</dev/stdin)
+   #  _is_empty "${new_1}" \
+   #    || set -- "${new_1}" "${@:1:2}"
+   ###################################### allows reading from a tee ##
    # e.g.
    # echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
    #  or
@@ -46,18 +46,17 @@
 
       # there is something in stdin put it in ${@:1}
         read -t 0 \
-           && new_1="$(cat </dev/stdin & wait)"
-           #&& new_1=$(</dev/stdin)
+          && new_1="$(cat </dev/stdin & wait)"
 
       # append to parameters
         _is_empty "${new_1}" \
-           || set -- "${new_1}" "${@:1:2}"
+          || set -- "${new_1}" "${@:1:2}"
       #
         message="${1:-lorem ipsum dolor sit amet}"
       # remove ANSI escape sequences
         message="$(sed -e 's/\x1b\[[0-9;]*m//g' <<< "${message}")"
 
-      # in case $LOG is not set
+      # in case $LOG _is_not_set
         log="${2:-$LOG}"
         log="${log:-/dev/null}"
 
@@ -74,17 +73,17 @@
 
       # running non-interactively but not from systemd: print to stdout and $log
         _is_unset PRE_UP_RUN \
-           &&
+          &&
         printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}" \
           ||
         echo "${message}"
       # send message to stdout
-           # cat to systemd journal
-             #systemd-cat -t pia-wireguard -p warning <<< "${message}"
+      # cat to systemd journal
+        #systemd-cat -t pia-wireguard -p warning <<< "${message}"
     }
   export -f _logger
 
-  # match 'value' in kodi json
+  # match 'value' in kodi json results
     function _parse_JSON {
         local key=$1
         /usr/bin/awk -F"[,:}]" \
@@ -147,8 +146,7 @@
   # epoch creation time of file
     function _created() {
         /opt/bin/stat -c %Y "${1}" 2>/dev/null \
-                  ||
-                 echo $?
+          || echo $?
         return 0
  }
     export -f _created
