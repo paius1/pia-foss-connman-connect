@@ -584,7 +584,7 @@ For example, you can try 0.2 for 200ms allowed latency.
           echo " - $location"
         done <      /opt/etc/piavpn-manual/latencyList #
         echo
-
+                sleep 0.01 # read prompt before latencyList
         # Receive input to specify the server to connect to manually
         while :; do
           read -r -p "Input the number of the server you want to connect to ([1]-[$i]) : " serverSelection

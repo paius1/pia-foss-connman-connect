@@ -229,7 +229,7 @@ echo -e "${green}OK!${nc}"
     WireGuard.PublicKey = ${PublicKey}
     WireGuard.AllowedIPs = ${AllowedIPs}
     WireGuard.EndpointPort = ${Endpoint#*:}
-    WireGuard.PersistentKeepalive = ${PersistentKeepalive}
+    #WireGuard.PersistentKeepalive = ${PersistentKeepalive}
 	EOF
     #
     echo "OK!" #

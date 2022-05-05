@@ -106,12 +106,17 @@
       # This section allows reading from a tee
       # e.g. echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
       # wait for stdin from a pipe
-        #sleep 0.01
+        sleep 0.01
 
       # there is something in stdin put it in ${@:1}
-        if test ! -t 0; then
-            set -- "$(cat <&0 & wait)" "${@:1:2}"
-        fi
+        #if test ! -t 0; then
+         #   set -- "$(cat <&0 & wait)" "${@:1:2}"
+        #fi
+        read -t 0 \
+           && new_1="$(cat </dev/stdin & wait)"
+
+        _is_empty "${new_1}" \
+           || set -- "${new_1}" "${@:1:2}"
 
       # only last line of multi line messages
         message="$(sed -n '$p' <<< "${1:-lorem ipsum dolor sit amet}")"
@@ -135,7 +140,7 @@
         [[ -s "${image_path}/${image}" ]] \
           && show_image=',"image":"'"${image_path}/${image}"'"'
 
-        status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA Wireguard Connection", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${show_image}"' }, "id": 1} '))"
+        status="$( _parse_JSON 'result' < <(_kodi_REQ ' {"jsonrpc": "2.0", "method": "GUI.ShowNotification", "params": {"title": "PIA-Wireguard Manager", "message": "'"${message}"'" , "displaytime": '"${displaytime}"''"${show_image}"' }, "id": 1} '))"
 
         [[ "$status" =~ OK ]] \
           || return 1

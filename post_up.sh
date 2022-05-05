@@ -142,11 +142,13 @@ done
     if [[ "${PIA_DNS}" == "true" ]]
     then
   # Check and reset nameservers set by connmanctl
-         if [[ "$(awk '/nameserver / {print $NF; exit}' /run/connman/resolv.conf)" != "${WireGuard_DNS}" ]]
+         mapfile -t resolv_conf < /run/connman/resolv.conf
+         [[ "${resolv_conf[@]}" =~ nameserver[[:blank:]]*(.*)$ ]]
+         if [[ "${BASH_REMATCH[1]%% *}" != "${WireGuard_DNS}" ]]
          then _logger "Replacing Connman's DNS with PIA's DNS"
        # connman subordinates vpn dns to any preset nameservers
             # replace headers and first nameserver with $DNS to temporary file
-              sed -i -r "s/Connection Manager/PIA-WIREGUARD/;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${WireGuard_DNS:-10.0.0.243}/}" \
+              sed -i -r "s|Connection Manager|PIA-WIREGUARD|;s|search[[:blank:]]*.*|search ${Domain}|;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${WireGuard_DNS:-10.0.0.243}/}" \
               /run/connman/resolv.conf
               echo
          fi
@@ -154,7 +156,7 @@ done
          #up="$(</proc/uptime)"
          #if [[ "${up%%.*}" -gt 120 ]]
          #then DNS_SERVER="$(_parse_JSON 'city' < <(./dnsleaktest.py -j ))"
-              #echo  "DNS server is in ${DNS_SERVER}" |
+              #echo  "DNS server is in ${DNS_SERVER[0]}" |
               #tee >(_logger) >(_is_not_tty && _pia_notify) >/dev/null
               #sleep 3
          #fi
@@ -165,7 +167,7 @@ done
     then
   # print instructions for starting port forwarding later
          echo -e "    To enable port forwarding run\n"
-         echo -e "    $(< /opt/etc/piavpn-manual/port_forward.cmd )"
+         echo -e "    $(< /opt/etc/piavpn-manual/port_forward"${cli}".cmd )"
          echo
          echo -e "    The location used must be port forwarding enabled, or this will fail."
          echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."

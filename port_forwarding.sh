@@ -96,14 +96,14 @@ fi
     fatal_error () { #
         local port="${1}" #
         echo "Fatal error::port_forwarding.sh" |
-        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') #
+        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') >/dev/null #
          sleep 10 #
 
       # remove port from iptables #
         iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
 
         echo "Attempting restart of port forwarding" |
-        tee >(_logger) >(_pia_notify 5000 'pia_off_48x48.png') #
+        tee >(_logger) >(_pia_notify 5000 'pia_off_48x48.png') >/dev/null  #
         sleep 15 #
     
         PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$PF_GATEWAY PF_HOSTNAME=$PF_HOSTNAME \
@@ -113,9 +113,9 @@ fi
 
   # Handle shutdown behavior
     finish () { #
-        echo "Port forward rebinding stopped. The port will likely close soon." |
-        tee >(_logger) \
-            >(systemctl --quiet is-active  pia-wireguard.service && _pia_notify 5000 'pia_off_48x48.png' ) >/dev/null #
+        _logger < <( echo "Port forward stopped. The port close soon." |
+        tee >(systemctl --quiet is-active  pia-wireguard.service && _pia_notify 5000 'pia_off_48x48.png' ) ) #
+
         #_logger "Port forward rebinding stopped. The port will likely close soon." #
 
       # remove port from iptables #
@@ -124,7 +124,7 @@ fi
 
         exit 0 #
  }
-    trap finish SIGTERM SIGINT SIGQUIT #
+    trap 'finish' SIGTERM SIGINT SIGQUIT #
 
   # replace any currently running port_forwarding.sh's #
     pids=($(pidof port_forwarding.sh)) #
