@@ -46,7 +46,7 @@
 
       # there is something in stdin put it in ${@:1}
         read -t 0 \
-          && new_1="$(cat </dev/stdin & wait)"
+          && new_1=$(</dev/stdin)
 
       # append to parameters
         _is_empty "${new_1}" \
@@ -56,7 +56,7 @@
       # remove ANSI escape sequences
         message="$(sed -e 's/\x1b\[[0-9;]*m//g' <<< "${message}")"
 
-      # in case $LOG _is_not_set
+      # in case $LOG is not set
         log="${2:-$LOG}"
         log="${log:-/dev/null}"
 
@@ -184,6 +184,12 @@
         [[ -z "${1}" ]]
  } #
     export -f _is_empty
+
+  # check variable set
+    function _is_set() {
+        [[ -n "${1}" ]]
+ } #
+    export -f _is_set
 
   # running interactively
     function _is_tty() {
