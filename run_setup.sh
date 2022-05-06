@@ -72,29 +72,29 @@
        [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
     then 
   # not called by systemd or interactively, and systemd service exists #
-         systemd-cat -t pia-wireguard.favourites -p notice \
-                    <<< "(Re)starting pia-wireguard.service from outside of systemd" #
+
+         systemd-cat -t pia-wireguard.favourites -p notice < \
+                    <(echo "(Re)starting pia-wireguard.service from outside of systemd" |&
+                      tee >(LOG=/tmp/pia-wireguard.log _logger >/dev/null )) #
        # log this to systemd journal and pia-wireguard log (n.b wait for command) #
-         LOG=/tmp/pia-wireguard.log echo 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"'' | #
-         tee >( sleep 0.01; _logger) #>(_is_not_tty && _pia_notify ) >/dev/null; sleep 5 #
-                                     # optional Gui notificaton #
 
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
          in #
        # systemd service active #
-            0|true)  SRe_prefix='Res' #
+            0|true)  action='Restarting' #
                      systemctl restart pia-wireguard.service & #
+                     disown
                     ;; #
-            *|false) SRe_prefix='S' #
+            *|false) action='Starting' #
                      systemctl start pia-wireguard.service & #
+                     disown
              ;; #
          esac #
 
-         systemd-cat -t pia-wireguard.favourites -p notice \
-                    <<< "${SRe_prefix}tarted pia-wireguard.service" #
        # log this to systemd journal and pia-wireguard log #
-         LOG=/tmp/pia-wireguard.log _logger "${SRe_prefix}tarted pia-wireguard.service" #
-
+         systemd-cat -t pia-wireguard.favourites -p notice < \
+                    <(echo "${action}tarted pia-wireguard.service" |&
+                      tee >(LOG=/tmp/pia-wireguard.log _logger "${action} pia-wireguard.service" >/dev/null)) #
          exit 0 #
 
     elif _is_unset PRE_UP_RUN \
@@ -109,9 +109,9 @@
          sleep 5 #
 
     elif _is_unset PRE_UP_RUN #
-    then #
+    then export PRE_UP_RUN='cli' #
   # run is interactive: set PRE_UP_RUN and check systemd #
-         export PRE_UP_RUN='cli' #
+
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
          in #
        # systemd service active #
@@ -123,11 +123,15 @@
                           exit 0; } #
 
                    # log this to systemd journal #
-                     systemd-cat -t pia-wireguard.cmdline -p notice \
-                                <<< "Stopping pia-wireguard.service from the command line" #
-                     systemctl stop pia-wireguard.service #
+                     systemd-cat -t pia-wireguard.cmdline -p notice < \
+                                 <(echo "Stopping pia-wireguard.service from the command line" |&
+                                   tee -i >(_logger >/dev/null)) #
+
+                     systemctl stop pia-wireguard.service & #
+                     disown
                    # Stop pia-wireguard service #
                    ;; #
+
             *|false) echo "pia-wireguard service? is not running" #
              ;; #
          esac #
@@ -159,25 +163,30 @@
       #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4 #
       #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
 
-  # ConditionFileNotEmpty=/storage/sources/pia-wireguard/.env #
+  # ConditionFileNotEmpty=.env #
     # systemd check for non empty .env file #
     if [[ -s .env ]] #
     then _logger "Load .env file" #
   # read variables from .env file #
          source .env  #
 
-    elif _is_tty #
-    then echo "Get ready to rumble" #
-  # run is interactive w/o a .env file #
-
-    else echo "No valid PIA config -> $(pwd)/.env" |
+    elif _is_not_tty #
+    then echo "No valid PIA config -> $(pwd)/.env" |
   # fail without minimal .env file #
          tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') >/dev/null #
-
          sleep 10
+
          _pia_notify "CONNECTION FAILED" 100000 #
          exit 1 #
+
+    else echo "Get ready to rumble" #
+  # run is interactive w/o a .env file #
     fi #
+
+  # system maintanence for backup files
+    find /opt/etc/piavpn-manual/wireguard_json* -name '*.cmd*' -mmin +1440 -delete > /dev/null
+    find /opt/etc/wireguard/ -name '*.conf~' -mmin +1440 -delete > /dev/null
+    find /storage/.config/wireguard/ -name '*.config~' -mmin +1440 -delete > /dev/null
 
   # changes in .env file? # NOTE to self when disconnecting touch pia.config to reset creation time
     # none and pia.config is < 24hrs old, skip to ./post_up.sh #
@@ -205,8 +214,6 @@
                    esac #
               else _logger "Need fresh pia.config" #
             # day old config #
-                   rm -v /opt/etc/wireguard/pia.conf
-                   rm -v /storage/.config/wireguard/pia.config
               fi #
 
          else _logger "      .env file has changed, running thru setup" #
@@ -272,17 +279,17 @@
 
        # BOTHER ABOUT PREFERRED_REGION='' BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
          _is_empty "${PREFERRED_REGION}" \
-         && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
-              sleep "$((BOTHER/1000))"; } #
+           && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
+                sleep "$((BOTHER/1000))"; } #
 
        # set PIA_PF and PIA_DNS, notify if forcing PIA_DNS #
          PIA_PF="${PIA_PF:-false}" #
 
          if _is_empty "${PIA_DNS}" #
          then echo "FORCED PIA DNS" |
+       # force PIA_DNS=true
               tee >(_logger) >(_pia_notify) >/dev/null #
               sleep 2 #
-       # force PIA_DNS=true
               export PIA_DNS='true' #
          fi #
 
@@ -291,7 +298,7 @@
     fi #
 
   # PRE_UP_RUN has been set true by systemd, or 'cli' if _is_tty #
-  # if not then call ./pre_up.sh #
+  # if not then call ./pre_up.sh # 'cli' will run preup.sh at the end
     if _is_unset PRE_UP_RUN #
     then _logger "Setting up sane environment" #
   # no systemd service or not running interactively #
@@ -330,7 +337,7 @@ fi
 
     # Erase previous authentication token if present
     # changed paths from /opt/ #
-    # and commented rm token, is valid for 24 hrs #
+    # and commented rm token, it's valid for 24 hrs #
     #rm -f /opt/etc/piavpn-manual/token /opt/etc/piavpn-manual/latencyList #
     #rm -f /opt/etc/piavpn-manual/latencyList #
 
@@ -452,7 +459,7 @@ ${green}Defaulting to yes.${nc}
   echo "sysctl -w net.ipv6.conf.default.disable_ipv6=0"
   echo -e "${nc}"
      else echo "IPv6 has been disabled" |
-          tee >(_logger) >(_pia_notify) >/dev/null #
+          tee >(_logger) >/dev/null #>(_pia_notify) >/dev/null #
      fi #
   sysctl -w net.ipv6.conf.all.disable_ipv6=1
   sysctl -w net.ipv6.conf.default.disable_ipv6=1
@@ -619,8 +626,8 @@ For example, you can try 0.2 for 200ms allowed latency.
       else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
 
            if _is_not_tty #
-         # RUNNING NON-INTERACTIVELY #
            then echo "No Available Servers Found!" |
+         # RUNNING NON-INTERACTIVELY #
                 tee >(_logger) >(_pia_notify "${BOTHER}") >/dev/null #
            fi #
         exit 1

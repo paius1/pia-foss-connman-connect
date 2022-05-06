@@ -21,7 +21,7 @@
    #    && new_1=$(</dev/stdin)
    #  _is_empty "${new_1}" \
    #    || set -- "${new_1}" "${@:1:2}"
-   ###################################### allows reading from a tee ##
+   ##################################### allows reading from a tee ##
    # e.g.
    # echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
    #  or
@@ -44,7 +44,7 @@
       # wait for stdin from a pipe
         sleep 0.01
 
-      # there is something in stdin put it in ${@:1}
+      # there is something in stdin
         read -t 0 \
           && new_1=$(</dev/stdin)
 

@@ -51,12 +51,16 @@
     then
   # not called by systemd or interactively, and systemd service exists #
        # notify systemd
-         systemd-cat -t pia-wireguard.favourites -p notice \
-                    <<< "Stopping pia-wireguard.service from outside of systemd"
-         LOG=/tmp/pia-wireguard.log _logger 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"''
        # log this in pia-wireguard log
+       # notify systemd and log to pia-wireguard log
+         systemd-cat -t pia-wireguard.favourites -p notice < \
+                    <( echo "Stopping pia-wireguard.service from outside of systemd" |&
+                       tee -i >(_logger >/dev/null))
+                       
+                       # 'Called outside of systemd. Service is '" $(systemctl is-active  pia-wireguard.service)"''
 
          systemctl stop pia-wireguard.service &
+         disown
        # calls this script with PRE_UP_RUN set
          exit 0
     elif _is_not_tty
@@ -71,10 +75,13 @@
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)"
          in
           # systemd service active
-            0|true)  systemd-cat -t pia-wireguard.cmdline -p notice \
-                                <<< "Stopping pia-wireguard.service from the command line"
-                     systemctl stop pia-wireguard.service & disown
-                   # calls this script with PRE_UP_RUN set
+            0|true)  systemd-cat -t pia-wireguard.cmdline -p notice < \
+                                <(echo "Stopping pia-wireguard.service from the command line" |&
+                                  tee -i (_logger >/dev/null))
+
+                     systemctl stop pia-wireguard.service &
+                     disown
+                   # recalls this script with PRE_UP_RUN set
                      exit 0
                 ;;
             *|false) PRE_UP_RUN='cli'
@@ -95,12 +102,14 @@
   # vpn active
 
          wg_0_file="$(grep -l --exclude='~$' "${wg_0##*_}" ~/.config/wireguard/*.config 2>/dev/null)"
-         [[ "$(<${wg_0_file})" =~ Name.*\[(.*)\] ]]
+         [[ "$(<"${wg_0_file}")" =~ Name.*\[(.*)\] ]]
          REGION="${BASH_REMATCH[1]:-}"
 
        # GUI notification
-         _is_not_tty \
-         && _pia_notify 'Disconnected from '"${REGION}"' ' 5000 "pia_off_48x48.png"; sleep 5
+              sleep 0.2
+              echo 'Disconnected from '"${REGION}"' ' |
+              tee >(_logger) >(_pia_notify  5000 "pia_off_48x48.png") >/dev/null
+              sleep 5
 
        # reset pia.config age
          touch "${wg_0_file}"
@@ -158,6 +167,7 @@ EOF
          _logger "Stopped port forwarding"
        # clear the log file ?
          :> /tmp/port_forward.log
+         _logger "Stopped port forwarding"
     fi
 
   # flush vpn from routing table?

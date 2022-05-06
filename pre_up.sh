@@ -1,9 +1,9 @@
 #!/opt/bin/bash
 #    v 0.0.1, c plgroves gmail 2022
-#    SCRIPTNAME called by ExecStartPre in service unit file
+#    SCRIPTNAME called by ExecStartPre in service file
 #              PATH/run_setup.sh
 #           or PATH/connect_to_wireguard_with_token.sh,
-#              when run from tty
+#               when run from tty
 #        
 #        sets a safe and sane environment
 #         e.g. disconnect vpn_XX_XX_XX_XX
@@ -62,7 +62,7 @@
     readarray -t services < <(connmanctl services)
     [[ "${services[0]}" =~ (vpn_.*)$ ]]
 
-    if [[ -n "${wg_0:=${BASH_REMATCH[1]}}" ]]
+    if _is_set "${wg_0:=${BASH_REMATCH[1]}}"
     then _logger "$(connmanctl disconnect "${wg_0}")"
   # vpn active, disconnect
 
@@ -131,11 +131,11 @@ EOF
         if [ "${count}" -gt "${max_count}" ]
         then _logger "Interwebs failed after half a minute"
        # wait 30 seconds and exit, using count as exit status
-             count=1
              break
         fi
     done
     _logger "Have full network access"
+    count=0
 
   # port forwarding cleanup
     pf_pids=($(pidof port_forwarding.sh))
@@ -151,4 +151,4 @@ EOF
 
 ################ Add other applications to stop below #################
 #
-exit 0
+exit "${count}"

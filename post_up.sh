@@ -155,7 +155,7 @@ done
        ## https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
          #up="$(</proc/uptime)"
          #if [[ "${up%%.*}" -gt 120 ]]
-         #then DNS_SERVER="$(_parse_JSON 'city' < <(./dnsleaktest.py -j ))"
+         #then DNS_SERVER=("$(_parse_JSON 'city' < <(./dnsleaktest.py -j ))")
               #echo  "DNS server is in ${DNS_SERVER[0]}" |
               #tee >(_logger) >(_is_not_tty && _pia_notify) >/dev/null
               #sleep 3
@@ -217,17 +217,19 @@ done
                  && mapfile -t tokenFile < "${tokenLocation}"
          fi
 
-         if [[ -n "${tokenFile[0]}" ]]
-         then echo "    logging port_forwarding${cli}.cmd to /tmp/port_forward.log" |
+         if _is_set "${tokenFile[0]}"
+         then echo "    logging port_forwarding${cli}.cmd to /tmp/port_forward.log" |&
        # have token, proceed with ./port_forwarding.sh
               tee >(_logger) >/dev/null
 
-            # refresh PIA_TOKEN in port_forward.cmd
-              sed -i.bak "s|PIA_TOKEN=.* \(PF_G.*\)|PIA_TOKEN=${tokenFile[0]} \1|" /opt/etc/piavpn-manual/port_forward"${cli}".cmd
-
             # allow post_up.sh to continue
+
+            # WG_SERVER_IP=${Host//_/.}=PF_GATEWAY  WG_HOSTNAME=$Domain=PF_HOSTNAME
+                echo " PIA_TOKEN=${tokenFile[0]} PF_GATEWAY=${Host//_/.} PF_HOSTNAME=${Domain} $(pwd)/port_forwarding.sh" |&
+                tee >(_logger) >/dev/null
+
               ( sleep 2
-                source /opt/etc/piavpn-manual/port_forward"${cli}".cmd >> /tmp/port_forward.log 2>&1
+                PIA_TOKEN="${tokenFile[0]}" PF_GATEWAY="${Host//_/.}" PF_HOSTNAME="${Domain}" "$(pwd)"/port_forwarding.sh >> /tmp/port_forward.log 2>&1
               )>/dev/null & 
               disown
          else echo "Failed to get a valid token"

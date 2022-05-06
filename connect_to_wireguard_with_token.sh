@@ -121,7 +121,8 @@ export wireguard_json
 # Check if the API returned OK and stop this script if it didn't.
 if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   >&2 echo -e "${red}Server did not return OK. Stopping now.${nc}"
-            _is_not_tty &&_pia_notify "Server did not return OK. Stopping now."  '10000' 'pia_off_48x48.png' #
+            echo  "Server did not return OK. Stopping now." |
+            tee >(_logger) >(_is_not_tty && _pia_notify  '10000' 'pia_off_48x48.png') >/dev/null #
           # added for non-interactive #
   exit 1
 fi
@@ -248,7 +249,6 @@ echo -e "${green}OK!${nc}"
   # CONNMAN_CONNECT is set true by systemd #
   # AUTOCONNECT true|false from .env (default false) if run non-interactively #
   # TO CONNECT OR NOT
-
 # MOVED actual CONNECTION to post_up.sh #
 # so we can skip this script if pia.config is still valid #
 
@@ -275,8 +275,9 @@ echo -e "${green}OK!${nc}"
                    exit 0 #
               else echo -e "User wishes to proceed with connection\n" #
             # connect
-                   
-                   export CONNMAN_CONNECT=true # proceed with connection
+
+                 # proceed with connection
+                   export CONNMAN_CONNECT=true
               fi #
          else _print_connection_instructions #
        # running non-interactively, log and Gui.Notifications #
@@ -327,12 +328,6 @@ echo -e "${green}OK!${nc}"
   # interactive w/o systemd service defered run of pre_up.sh #
          ./pre_up.sh #
     fi #
-
-  # Moving port forwarding to post_up.sh loses all of these variables #
-  # save the command to a file, and eval post_up #
-    echo " PIA_TOKEN=${PIA_TOKEN} \\
- PF_GATEWAY=${WG_SERVER_IP} PF_HOSTNAME=${WG_HOSTNAME} \\
- $(pwd)/port_forwarding.sh" > /opt/etc/piavpn-manual/port_forward"${cli}".cmd #
 
     if [[ "${PRE_UP_RUN}" != 'true' ]] #
     then echo -e "Not called by systemd" #
