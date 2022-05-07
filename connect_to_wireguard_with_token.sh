@@ -145,7 +145,7 @@ if [[ $PIA_DNS == "true" ]]; then
   echo "and ensure ${dnsServer} is the first one" #
   echo
             fi #
-  dnsSettingForVPN="DNS = ${dnsServer}" #
+  dnsSettingForVPN="DNS = ${dnsServer}"
 fi
 echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
           # changed path #
@@ -225,7 +225,7 @@ echo -e "${green}OK!${nc}"
     Domain = ${WG_HOSTNAME}
     WireGuard.Address = ${Address}/24
     WireGuard.ListenPort = ${Endpoint#*:}
-    WireGuard.DNS = ${DNS}
+    $(_is_set ${DNS} && echo "WireGuard.DNS = ${DNS}")
     WireGuard.PrivateKey = ${PrivateKey}
     WireGuard.PublicKey = ${PublicKey}
     WireGuard.AllowedIPs = ${AllowedIPs}
