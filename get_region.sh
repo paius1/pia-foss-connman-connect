@@ -41,7 +41,7 @@
   # Progress... run while waiting for server list #
     if 
     [[ "${IVE_RUN}" -eq 0 ]] \
-     || \
+     ||
     [[ "${IVE_RUN}" -eq 2 && "${AUTOCONNECT}" = 'true' ]] #
     then dots='••••••••••••••••••••••••••••••••••••••••••••••••••' # multibyte
   # keep sending notification while servers are being read quessed at 40 seconds #   
@@ -111,8 +111,8 @@ get_selected_region_data() {
     echo -e "${red}The REGION_ID $selectedRegion is not valid.${nc}
     "
          else _pia_notify 'The REGION '"${selectedRegion}"' is not valid.' #
+       # keep going in non-interactive mode #
               sleep 5 #
-              # keeps going in non-interactive mode #
          fi #
     exit 1
   fi
@@ -141,9 +141,9 @@ fi
   # changed the path #
     mkdir -p /opt/etc/piavpn-manual #
 # Erase old latencyList file
-    # Save for use later
-    # rm -f /opt/etc/piavpn-manual/latencyList #
-    touch /opt/etc/piavpn-manual/latencyList #
+    # Save for use later #
+    #rm -f /opt/etc/piavpn-manual/latencyList #
+    #touch /opt/etc/piavpn-manual/latencyList #
 
 # This allows you to set the maximum allowed latency in seconds.
 # All servers that respond slower than this will be ignored.

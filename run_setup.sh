@@ -75,8 +75,8 @@
 
          systemd-cat -t pia-wireguard.favourites -p notice < \
                     <(echo "(Re)starting pia-wireguard.service from outside of systemd" |&
+       # log this to systemd journal and pia-wireguard log #
                       tee >(LOG=/tmp/pia-wireguard.log _logger >/dev/null )) #
-       # log this to systemd journal and pia-wireguard log (n.b wait for command) #
 
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
          in #
@@ -91,18 +91,18 @@
              ;; #
          esac #
 
-       # log this to systemd journal and pia-wireguard log #
          systemd-cat -t pia-wireguard.favourites -p notice < \
                     <(echo "${action}tarted pia-wireguard.service" |&
+       # log this to systemd journal and pia-wireguard log #
                       tee >(LOG=/tmp/pia-wireguard.log _logger "${action} pia-wireguard.service" >/dev/null)) #
          exit 0 #
 
     elif _is_unset PRE_UP_RUN \
            &&
          _is_not_tty #
-    then 
+    then export LOG="${LOG:-/tmp/pia-wireguard.log}" #
   # not called by systemd or interactively #
-         export LOG="${LOG:-/tmp/pia-wireguard.log}" #
+
          _logger "found no systemd service logging to ${LOG}" #
          _pia_notify "logging to ${LOG}" #
        # force displaytime #
@@ -122,14 +122,14 @@
                      && { echo "Goodbye";
                           exit 0; } #
 
-                   # log this to systemd journal #
                      systemd-cat -t pia-wireguard.cmdline -p notice < \
                                  <(echo "Stopping pia-wireguard.service from the command line" |&
+                   # log this to systemd journal an log #
                                    tee -i >(_logger >/dev/null)) #
 
+                   # Stop pia-wireguard service #
                      systemctl stop pia-wireguard.service & #
                      disown #
-                   # Stop pia-wireguard service #
                    ;; #
 
             *|false) echo "pia-wireguard service? is not running" #
@@ -171,7 +171,7 @@
          source .env  #
 
     elif _is_not_tty #
-    then echo "No valid PIA config -> $(pwd)/.env" |
+    then echo "No valid PIA config -> $(pwd)/.env" |&
   # fail without minimal .env file #
          tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') >/dev/null #
          sleep 10
@@ -199,8 +199,8 @@
          if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
          then _logger "    .env is unchanged" #
        # .env is unchanged #
-              age_pia_config="$(_interval "$(_created /storage/.config/wireguard/pia.config)")" #
 
+              age_pia_config="$(_interval "$(_created /storage/.config/wireguard/pia.config)")" #
               if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
               then _logger "    pia.config last connected $(_hmmss "${age_pia_config}") ago" #
             # wireguard/pia.config is less that 24 hours old   #
@@ -212,7 +212,8 @@
                       *)  ./post_up.sh & exit 0 ;; #
                     # call ./post_up.sh & exit for favourites #
                    esac #
-              else _logger "Need fresh pia.config" #
+
+              else _logger "Creating fresh pia.config" #
             # day old config #
               fi #
 
@@ -222,12 +223,13 @@
          fi #
 
     elif [[ ! -s /opt/etc/piavpn-manual/sha1sum.env ]] #
-    then echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
+    then echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" |& #
   # create /opt/etc/piavpn-manual/sha1sum.env #
+         tee >(_logger) >/dev/null & #
          sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
 
-#    else echo "Running interactively skipped checksum and .env check" #
-  # running interactively #
+#else echo "Running interactively skipped checksum and .env check" #
+# running interactively #
     fi #
 
   # NON-INTERACTIVE CHECK/SET VARIABLES #
@@ -252,7 +254,7 @@
               exit 1 #
          fi #
 
-       # PREFERRED_REGION|AUTOCONNECT will create a connman config  with no interaction #
+       # PREFERRED_REGION|AUTOCONNECT can create a connman config  with no interaction #
        # AUTOCONNECT|CONNMAN_CONNECT = false|null requires using Settings > CoreELEC > Connections #
        #   and sets NO FIREWALL or port forwarding #
 
@@ -278,15 +280,16 @@
           fi
 
        # BOTHER ABOUT PREFERRED_REGION='' BECAUSE IT MAKES THE SCRIPT TAKE A LONG TIME?! #
+       # in a post-modem world #
          _is_empty "${PREFERRED_REGION}" \
            && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
-                sleep "$((BOTHER/1000))"; } #
+                sleep "$((BOTHER/2000))"; } #
 
        # set PIA_PF and PIA_DNS, notify if forcing PIA_DNS #
          PIA_PF="${PIA_PF:-false}" #
 
          if _is_empty "${PIA_DNS}" #
-         then echo "FORCED PIA DNS" |
+         then echo "FORCED PIA DNS" |& #
        # force PIA_DNS=true
               tee >(_logger) >(_pia_notify) >/dev/null #
               sleep 2 #

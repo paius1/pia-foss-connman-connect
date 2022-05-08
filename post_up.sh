@@ -82,8 +82,9 @@
            _is_not_tty \
            && sleep 6
 
-       # recreated inline variables from connect_to_w...sh
-         read -r PIA_TOKEN</opt/etc/piavpn-manual/token; WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" _print_connection_instructions
+       # recreate inline variables from connect_to_w...sh
+         read -r PIA_TOKEN</opt/etc/piavpn-manual/token; WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" \
+         _print_connection_instructions
          exit 0
     fi
 
@@ -105,7 +106,7 @@
 
   # Connect with connmanctl
     until [[ -n "${wg_0:=${BASH_REMATCH[1]}}" ]]
-    do connmanctl connect "${SERVICE}"
+    do connmanctl connect "${SERVICE}" 2>/dev/null
        ((n++)) 
        echo "connection tries = ${n}"
        [[ "${n}" -ge 5 ]] && break
@@ -137,19 +138,21 @@ done
   # FAILURE
          echo 'CONNMAN failed to connect to '"${REGION_NAME}"'!' |
          tee >( _logger ) >( _is_not_tty && _pia_notify 10000 'pia_off_48x48.png' ) >/dev/null
-         exit 255
+         exit "${n}"
     fi
 
     if [[ "${PIA_DNS}" == "true" ]]
     then
   # Check and reset nameservers set by connmanctl
          mapfile -t resolv_conf < /run/connman/resolv.conf
-         [[ "${resolv_conf[@]}" =~ nameserver[[:blank:]]*(([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}) ]] #([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}
+         [[ "${resolv_conf[@]}" =~ nameserver[[:blank:]]*(([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}) ]]
          if [[ "${BASH_REMATCH[1]}" != "${WireGuard_DNS}" ]]
          then _logger "Replacing Connman's DNS with PIA's DNS"
        # connman subordinates vpn dns to any preset nameservers
             # replace headers and first nameserver with $DNS to temporary file
-              sed -i -r "s|Connection Manager|PIA-WIREGUARD|;s|search[[:blank:]]*.*|search ${Domain}|;0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${WireGuard_DNS:-10.0.0.243}/}" \
+              sed -i -r "s|Connection Manager|PIA-WIREGUARD|;
+                         s|search[[:blank:]]*.*|search ${Domain}|;
+                         0,/nameserver/{s/([0-9]{1,3}\.){3}[0-9]{1,3}/${WireGuard_DNS:-10.0.0.243}/}" \
               /run/connman/resolv.conf
               echo
          fi
@@ -168,7 +171,9 @@ done
     then
   # No, print instructions for starting port forwarding later
          echo -e "    To enable port forwarding run\n"
-         echo -e "    $(< /opt/etc/piavpn-manual/port_forward"${cli}".cmd )"
+         read -r PIA_TOKEN</opt/etc/piavpn-manual/token #; WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}"
+         echo -e " PIA_TOKEN=${PIA_TOKEN} PF_GATEWAY=${Host//_/.} PF_HOSTNAME=${Domain}  \\"
+         echo -e " $(pwd)/port_forwarding.sh"
          echo
          echo -e "    The location used must be port forwarding enabled, or this will fail."
          echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
@@ -179,7 +184,6 @@ done
     else
   # Yes, start port_forward.sh
 
-         tokenLocation=/opt/etc/piavpn-manual/token
          function _get_token() {
              check_vars  PIA_USER PIA_PASS
              if PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" "$(pwd)"/get_token.sh
@@ -188,7 +192,7 @@ done
              fi
          }        
 
-         if [[ -s "${tokenLocation}" ]]
+         if [[ -s "${tokenLocation:=/opt/etc/piavpn-manual/token}" ]]
          then
        # have tokenFile #
 
@@ -210,6 +214,7 @@ done
 
               else echo "token expired saving a new one to ${tokenLocation}"
             # day old, refresh 
+                   unset tokenFile
                    _get_token \
                      && mapfile -t tokenFile < "${tokenLocation}"
               fi
@@ -249,14 +254,14 @@ done
   # SYSTEM START, wait and load ip_tables module if required
          #sleep 3
 
-         if [[ ! "$(lsmod)" =~ ip_tables[[:blank:]] ]]
+         if [[ ! "$(lsmod)" == *"ip_tables"* ]]
          then _logger "ip_tables module not loaded"
        # ip_tables module not loaded yet Don't know when it normally is
               modprobe ip_tables
               sleep 1
          fi
 
-         [[ "$(lsmod)" =~ ip_tables[[:blank:]] ]] \
+         [[ ! "$(lsmod)" == *"ip_tables"* ]] \
            && _logger "${BASH_REMATCH[0]} module loaded"
     fi
 

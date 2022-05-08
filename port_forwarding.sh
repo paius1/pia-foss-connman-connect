@@ -139,6 +139,8 @@ fi
             then unset pids[$i] #
             fi #
          done #
+
+       # kill the remainders
          echo "${pf_pids[@]}" |
          xargs -d $'\n' sh -c 'for pid do kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null; done' _ #
     fi #

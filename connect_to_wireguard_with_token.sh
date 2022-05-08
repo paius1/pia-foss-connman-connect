@@ -121,11 +121,12 @@ export wireguard_json
 # Check if the API returned OK and stop this script if it didn't.
 if [[ $(echo "$wireguard_json" | /opt/bin/jq -r '.status') != "OK" ]]; then #
   >&2 echo -e "${red}Server did not return OK. Stopping now.${nc}"
-            echo  "Server did not return OK. Stopping now." |
+            echo  "Server did not return OK. Stopping now." |& #
             tee >(_logger) >(_is_not_tty && _pia_notify  '10000' 'pia_off_48x48.png') >/dev/null #
           # added for non-interactive #
   exit 1
 fi
+          # backup wireguard_json
             echo "${wireguard_json}" > /opt/etc/piavpn-manual/wireguard_json-"${WG_HOSTMANE}" #
 
 # Create the WireGuard config based on the JSON received from the API
@@ -209,12 +210,13 @@ echo -e "${green}OK!${nc}"
     fi #
 
   # convert wireguard .conf to connman .config #
+
   # read pia${plus}.conf into variables #
-    declare Address PrivateKey PersistentKeepalive PublicKey AllowedIPs Endpoint
+    declare Address PrivateKey PersistentKeepalive PublicKey AllowedIPs Endpoint #
     eval "$(grep -e '^[[:alpha:]]' /opt/etc/wireguard/pia"${plus}".conf | sed 's| = |=|')" #
     REGION_NAME="$(/opt/bin/jq -r '.name' /opt/etc/piavpn-manual/regionData)" #
 
-    # write wireguard config #
+  # write wireguard config #
     cat <<-EOF > /storage/.config/wireguard/pia"${cli}".config
     [provider_wireguard]
     Type = WireGuard
@@ -238,19 +240,19 @@ echo -e "${green}OK!${nc}"
     cp -v /storage/.config/wireguard/pia"${cli}".config /storage/.config/wireguard/pia"${cli}${WG_HOSTNAME/#/-}".config~ #
 
   # determine names of VPN used by connmanctl #
-    SERVICE="vpn_${Endpoint%:*}${WG_HOSTNAME/#/_}"
+    SERVICE="vpn_${Endpoint%:*}${WG_HOSTNAME/#/_}" #
 
   # I placed this here for interactive use of these scripts #
   # CONNMAN_CONNECT is set true by systemd #
   # AUTOCONNECT true|false from .env (default false) if run non-interactively #
-  # TO CONNECT OR NOT
+  # TO CONNECT OR NOT #
 # MOVED actual CONNECTION to post_up.sh #
 # so we can skip this script if pia.config is still valid #
 
     if [[ "${CONNMAN_CONNECT}" = "true" ]] \
          ||
        [[ "${AUTOCONNECT}" = "true" ]] #
-    then echo "CONNMAN service ${SERVICE}! is ready" |
+    then echo "CONNMAN service ${SERVICE}! is ready" |& #
   # Skip to ./post_up.sh #
          tee -i >(_logger ) # >(_pia_notify ) >/dev/null #
          #sleep 1 #
@@ -324,11 +326,11 @@ echo -e "${green}OK!${nc}"
     fi #
 
     if [[ "${PRE_UP_RUN}" != 'true' ]] #
-    then echo -e "Not called by systemd" |
+    then echo -e "Not called by systemd" |& #
          tee -i >(_logger ) >/dev/null #
   # called outside of systemd, run ./post_up.sh manually #
   # have exported PRE_UP_RUN and CONNMAN_CONNECT cli=-(user_added)|NULL #
-         echo -e "calling $(pwd)/post_up.sh\n" |
+         echo -e "calling $(pwd)/post_up.sh\n" |& #
          tee -i >(_logger ) >/dev/null #
          ./post_up.sh & #
     fi #

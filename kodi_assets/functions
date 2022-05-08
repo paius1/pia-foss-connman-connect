@@ -78,19 +78,19 @@
           ||
         echo "${message}"
       # send message to stdout
-      # cat to systemd journal
         #systemd-cat -t pia-wireguard -p warning <<< "${message}"
+      # to systemd journal
     }
   export -f _logger
 
   # match 'value1|value2' in kodi json results
     function _parse_JSON {
-        local key=$1
+        local key="$1"
         /usr/bin/awk -F"[,:}]" \
                      '{for(i=1;i<=NF;i++)
                       {if($i~/'"${key}"'\042/)
                          {print $(i+1)}}}' |
-                    tr -d '"'
+                 tr -d '"'
  }
   export -f _parse_JSON
 
@@ -158,12 +158,12 @@
 
   # interval between now and then
     function _interval() {
-        local now 'then'
-        then="${1:-1}"
+        local now th3n
+        th3n="${1:-1}"
     
         now="$(printf '%(%s)T' |
                tee "${2:-/dev/null}")"
-        echo -n "$((now-${then}))"
+        echo -n "$((now-${th3n}))"
     return 0
  }
     export -f _interval

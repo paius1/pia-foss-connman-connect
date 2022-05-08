@@ -120,7 +120,7 @@ if [[ $(echo "$generateTokenResponse" | /opt/bin/jq -r '.status') != "OK" ]]; th
   echo -e "${red}Could not authenticate with the login credentials provided!${nc}"
   echo
      else #
-          _pia_notify "Could not authenticate " '15000' & #
+          _pia_notify "Could not authenticate " "${BOTHER}" #
      fi #
   exit 255 #
 fi
