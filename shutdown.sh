@@ -50,8 +50,6 @@
        [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]]
     then
   # not called by systemd or interactively, and systemd service exists #
-       # notify systemd
-       # log this in pia-wireguard log
        # notify systemd and log to pia-wireguard log
          systemd-cat -t pia-wireguard.favourites -p notice < \
                     <( echo "Stopping pia-wireguard.service from outside of systemd" |&
@@ -96,7 +94,7 @@
   # disconnect vpn_
   # 1st connected service, is it a vpn?
     readarray -t services < <(connmanctl services)
-    [[ "${services[0]}" =~ (vpn_.*)$ ]] #&& echo "${BASH_REMATCH[0]}"
+    [[ "${services[0]}" =~ (vpn_.*)$ ]]
     if [[ -n "${wg_0:=${BASH_REMATCH[1]}}" ]]
     then _logger "$(connmanctl disconnect "${wg_0}")"
   # vpn active
@@ -106,10 +104,8 @@
          REGION="${BASH_REMATCH[1]:-}"
 
        # GUI notification
-              sleep 0.2
-              echo 'Disconnected from '"${REGION}"' ' |
-              tee >(_logger) >(_pia_notify  5000 "pia_off_48x48.png") >/dev/null
-              sleep 5
+         _is_not_tty \
+           && _pia_notify 'Disconnected from '"${REGION}"' ' 5000 "pia_off_48x48.png"
 
        # reset pia.config age
          touch "${wg_0_file}"
@@ -164,7 +160,7 @@ EOF
   # stop port forwarding 
          echo "${pf_pids[@]}" |
          xargs -d $'\n' sh -c 'for pid do kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
-         _logger "Stopped port forwarding"
+
        # clear the log file ?
          :> /tmp/port_forward.log
          _logger "Stopped port forwarding"

@@ -26,8 +26,8 @@
     export PATH=/opt/bin:/opt/sbin:"${PATH}"
 
   # source functions
-    [ -z "${kodi_user}" ] \
-    && source ./kodi_assets/functions #
+    [[ -z "${kodi_user}" ]] \
+      && source ./kodi_assets/functions #
 
 # DEBUGGING
     #export LOG="${LOG:-/tmp/pia-wireguard.log}"
@@ -66,7 +66,7 @@
     then _logger "$(connmanctl disconnect "${wg_0}")"
   # vpn active, disconnect
 
-       # filename containing wg0's region name
+       # pia filename containing wg0's region name
          wg_0_file="$(grep -l --exclude='~$' "${wg_0##*_}" ~/.config/wireguard/*.config)"
          [[ "$(<"${wg_0_file}")" =~ Name.*\[(.*)\] ]]
          REGION_NAME="${BASH_REMATCH[1]:-}"
@@ -86,7 +86,9 @@
     if ! ping -c 1  -W 1  -q 208.67.222.222 > /dev/null 2>&1
     then iptables-restore < "${MY_FIREWALL:=openrules.v4}"
   # No # Note to self $MY_FIREWALL is passed to this script by run_setup.sh
+
          _logger "restored ${MY_FIREWALL} firewall"
+
     else _logger "Can reach interwebs"
   # Yes
     fi

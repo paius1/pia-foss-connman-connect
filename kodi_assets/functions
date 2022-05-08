@@ -83,7 +83,7 @@
     }
   export -f _logger
 
-  # match 'value' in kodi json results
+  # match 'value1|value2' in kodi json results
     function _parse_JSON {
         local key=$1
         /usr/bin/awk -F"[,:}]" \
@@ -113,7 +113,7 @@
          #   set -- "$(cat <&0 & wait)" "${@:1:2}"
         #fi
         read -t 0 \
-           && new_1="$(cat </dev/stdin & wait)"
+           && new_1="$( </dev/stdin)"
 
         _is_empty "${new_1}" \
            || set -- "${new_1}" "${@:1:2}"
@@ -213,35 +213,36 @@
         if _is_tty
         then
       # running interactively
-             echo -e "to connect manually go to"
-             echo -e "\tSettings > Coreelec > Connections, select WireGuard and connect"
-             echo -e "\t    This may not set DNS and"
-             echo -e "\t    WILL NOT set iptables killswitch!?"
-             echo -e "\tiptables-restore $(pwd)/rules-wireguard.v4     WILL!"
-             echo
-             echo  -e "\tTo (re)enable port forwarding run\n" 
-             echo -e "    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh"
+             (echo -e "to connect manually go to
+\tSettings > Coreelec > Connections, select PIA ${cli#-*} and connect
+\t    This may not set DNS and\tWILL NOT set iptables killswitch?
+\tiptables-restore $(pwd)/rules-wireguard.v4  WILL!
+\n\tTo (re)enable port forwarding run
+    PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$WG_SERVER_IP PF_HOSTNAME=$WG_HOSTNAME $(pwd)/port_forwarding.sh
+" 
              if [[ "${PIA_PF}" != 'true' ]]
            # add caveat
              then
-                  echo
-                  echo -e "\tThe location used must be port forwarding enabled, or this will fail."
-                  echo -e "\tCall PIA_PF=true $(pwd)/get_region for a filtered list."
+                  echo -e "\tThe location used must be port forwarding enabled.
+\tCall PIA_PF=true $(pwd)/get_region for a filtered list.
+" 
              fi
-             echo -e "\n\tport_forwading.sh must be left running to maintain the port"
-             echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background"
-             echo
+             echo -e "\tport_forwarding.sh must be left running to maintain the port
+\tIt WILL TIE UP A CONSOLE unless run in the background
+             " ) |&
+             tee -i >(_logger '/tmp/pia-wireguard.log') >/dev/null
+
         else
       # running non-interactively, log and Gui.Notifications
              echo 'Saved configuration for '"${REGION_NAME}"' ' |
               tee >(_logger; exit) >(_pia_notify; exit) >/dev/null
              sleep 3
-             echo "Goto Settings>Coreelec>Connections" |
+             echo "Goto Settings >Coreelec >Connections" |
               tee >(_logger; exit) >(_pia_notify 10000; exit ) >/dev/null
-             sleep 10
-             echo "This precludes port forwarding and setting a safe firewall" |
+             sleep 11
+             echo "This precludes port forwarding and setting a firewall" |
               tee >(_logger; exit) >(_pia_notify 6000 'pia_off_48x48.png'; exit) >/dev/null
-             sleep 7
+             sleep 5
              echo "Set CONNMAN_CONNECT=true to avoid this" |
               tee >(_logger; exit) >(_pia_notify 6000 'pia_off_48x48.png'; exit) >/dev/null
              sleep 6

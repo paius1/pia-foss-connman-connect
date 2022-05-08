@@ -49,8 +49,8 @@
   # check for empty/unset variables n.b. test unset passes VARIABLE NAME ONLY #
   # check is interactive or not #
   #
-    [ -z "${kodi_user}" ] \
-    && source ./kodi_assets/functions #
+    [[ -z "${kodi_user}" ]] \
+      && source ./kodi_assets/functions #
 
 # DEBUGGING # systemd logs to journal env LOG=/dev/null #
 #LOG="${LOG:-/tmp/pia-wireguard.log}" #
@@ -80,14 +80,14 @@
 
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
          in #
-       # systemd service active #
+       # systemd service is active #
             0|true)  action='Restarting' #
                      systemctl restart pia-wireguard.service & #
-                     disown
+                     disown #
                     ;; #
             *|false) action='Starting' #
                      systemctl start pia-wireguard.service & #
-                     disown
+                     disown #
              ;; #
          esac #
 
@@ -98,7 +98,7 @@
          exit 0 #
 
     elif _is_unset PRE_UP_RUN \
-            &&
+           &&
          _is_not_tty #
     then 
   # not called by systemd or interactively #
@@ -128,7 +128,7 @@
                                    tee -i >(_logger >/dev/null)) #
 
                      systemctl stop pia-wireguard.service & #
-                     disown
+                     disown #
                    # Stop pia-wireguard service #
                    ;; #
 
@@ -183,7 +183,7 @@
   # run is interactive w/o a .env file #
     fi #
 
-  # system maintanence for backup files
+  # system maintanence for day old backup files
     find /opt/etc/piavpn-manual/wireguard_json* -name '*.cmd*' -mmin +1440 -delete > /dev/null
     find /opt/etc/wireguard/ -name '*.conf~' -mmin +1440 -delete > /dev/null
     find /storage/.config/wireguard/ -name '*.config~' -mmin +1440 -delete > /dev/null
@@ -346,7 +346,7 @@ while :; do
     while :; do
       # Check for in-line definition of $PIA_USER
       if [[ -z $PIA_USER ]]; then
-        echo
+        echo; sleep 0.01
         read -r -p "PIA username (p#######): " PIA_USER
       fi
 
@@ -406,8 +406,7 @@ while :; do
     PIA_PASS=""
   else
           # read from saved token file
-            mapfile -t tokenFile < /opt/etc/piavpn-manual/token
-            PIA_TOKEN="${tokenFile[0]}"
+            read -r PIA_TOKEN</opt/etc/piavpn-manual/token #
     export PIA_TOKEN
 # token is good for 24 hours according to PIA #
     #rm -f /opt/etc/piavpn-manual/token #
@@ -526,6 +525,7 @@ server with the lowest latency ([N]o/[y]es): "
 If your connection has high latency, you may need to increase this value.
 For example, you can try 0.2 for 200ms allowed latency.
 "
+        sleep 0.01 #
       else
         latencyInput=$MAX_LATENCY
       fi

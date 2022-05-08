@@ -183,18 +183,11 @@ echo -e "${green}OK!${nc}"
     echo #
 
   # backup wireguard pia${plus}.conf
-    cp /opt/etc/wireguard/pia"${plus}".conf /opt/etc/wireguard/pia"${plus}-${WG_HOSTNAME}".conf~ #
+    cp -v /opt/etc/wireguard/pia"${plus}".conf /opt/etc/wireguard/pia"${plus}-${WG_HOSTNAME}".conf~ #
 
   # LibreElec doesn't include the iptables_raw kernel module #
-  # so it's not possible to set AllowedIps as 0.0.0.0/0 with wg-quick#
+  # so it's not possible to set AllowedIps as 0.0.0.0/0 with wg-quick #
   # CONNMAN sets up the interface, ignore wg-quick #
-# Notes
-  # since I can't get wg-quick to work #
-
-  # convert wireguard .conf to connman .config #
-  # read pia${plus}.conf into variables #
-    declare Address PrivateKey PersistentKeepalive PublicKey AllowedIPs Endpoint
-    eval "$(grep -e '^[[:alpha:]]' /opt/etc/wireguard/pia"${plus}".conf | sed 's| = |=|')" #
 
     echo -n "Trying to write connman pia.config..." #
 
@@ -215,7 +208,12 @@ echo -e "${green}OK!${nc}"
          fi #
     fi #
 
+  # convert wireguard .conf to connman .config #
+  # read pia${plus}.conf into variables #
+    declare Address PrivateKey PersistentKeepalive PublicKey AllowedIPs Endpoint
+    eval "$(grep -e '^[[:alpha:]]' /opt/etc/wireguard/pia"${plus}".conf | sed 's| = |=|')" #
     REGION_NAME="$(/opt/bin/jq -r '.name' /opt/etc/piavpn-manual/regionData)" #
+
     # write wireguard config #
     cat <<-EOF > /storage/.config/wireguard/pia"${cli}".config
     [provider_wireguard]
@@ -225,7 +223,7 @@ echo -e "${green}OK!${nc}"
     Domain = ${WG_HOSTNAME}
     WireGuard.Address = ${Address}/24
     WireGuard.ListenPort = ${Endpoint#*:}
-    $(_is_set ${DNS} && echo "WireGuard.DNS = ${DNS}")
+    $(_is_set "${DNS}" && echo "WireGuard.DNS = ${DNS}")
     WireGuard.PrivateKey = ${PrivateKey}
     WireGuard.PublicKey = ${PublicKey}
     WireGuard.AllowedIPs = ${AllowedIPs}
@@ -237,13 +235,10 @@ echo -e "${green}OK!${nc}"
     echo #
 
   # backup pia[-(user_added)].config
-    cp /storage/.config/wireguard/pia"${cli}".config /storage/.config/wireguard/pia"${cli}${WG_HOSTNAME/#/-}".config~ #
+    cp -v /storage/.config/wireguard/pia"${cli}".config /storage/.config/wireguard/pia"${cli}${WG_HOSTNAME/#/-}".config~ #
 
   # determine names of VPN used by connmanctl #
-  # from ~/.config/wireguard/pia${cli}.config #
-    declare Host Domain
-    eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia${cli}.config |  sed 's?\.?_?;s| = \(.*\)$|="\1"|')" #
-    SERVICE="vpn_${Host//./_}${Domain/#/_}"
+    SERVICE="vpn_${Endpoint%:*}${WG_HOSTNAME/#/_}"
 
   # I placed this here for interactive use of these scripts #
   # CONNMAN_CONNECT is set true by systemd #
@@ -268,8 +263,7 @@ echo -e "${green}OK!${nc}"
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
               echo #
-              if echo "${connect:0:1}" |
-                 grep -iq n #
+              if echo "${connect:0:1}" | grep -iq n #
               then _print_connection_instructions #
             # don't connect
                    exit 0 #
@@ -285,7 +279,7 @@ echo -e "${green}OK!${nc}"
          fi #
     fi #
 
-  # this was delayed when connecting from tty 
+  # this was delayed when called interactively
   # check for conflict with systemd #
   # run deferred ./pre_up.sh #
 
@@ -330,10 +324,12 @@ echo -e "${green}OK!${nc}"
     fi #
 
     if [[ "${PRE_UP_RUN}" != 'true' ]] #
-    then echo -e "Not called by systemd" #
+    then echo -e "Not called by systemd" |
+         tee -i >(_logger ) >/dev/null #
   # called outside of systemd, run ./post_up.sh manually #
   # have exported PRE_UP_RUN and CONNMAN_CONNECT cli=-(user_added)|NULL #
-         echo -e "calling $(pwd)/post_up.sh\n" #
+         echo -e "calling $(pwd)/post_up.sh\n" |
+         tee -i >(_logger ) >/dev/null #
          ./post_up.sh & #
     fi #
 

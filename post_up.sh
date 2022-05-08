@@ -82,7 +82,8 @@
            _is_not_tty \
            && sleep 6
 
-         _print_connection_instructions
+       # recreated inline variables from connect_to_w...sh
+         read -r PIA_TOKEN</opt/etc/piavpn-manual/token; WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" _print_connection_instructions
          exit 0
     fi
 
@@ -106,7 +107,7 @@
     until [[ -n "${wg_0:=${BASH_REMATCH[1]}}" ]]
     do connmanctl connect "${SERVICE}"
        ((n++)) 
-
+       echo "connection tries = ${n}"
        [[ "${n}" -ge 5 ]] && break
        sleep 1
        readarray -t services < <(connmanctl services)
@@ -143,8 +144,8 @@ done
     then
   # Check and reset nameservers set by connmanctl
          mapfile -t resolv_conf < /run/connman/resolv.conf
-         [[ "${resolv_conf[@]}" =~ nameserver[[:blank:]]*(.*)$ ]]
-         if [[ "${BASH_REMATCH[1]%% *}" != "${WireGuard_DNS}" ]]
+         [[ "${resolv_conf[@]}" =~ nameserver[[:blank:]]*(([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}) ]] #([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}
+         if [[ "${BASH_REMATCH[1]}" != "${WireGuard_DNS}" ]]
          then _logger "Replacing Connman's DNS with PIA's DNS"
        # connman subordinates vpn dns to any preset nameservers
             # replace headers and first nameserver with $DNS to temporary file
@@ -155,17 +156,17 @@ done
        ## https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
          #up="$(</proc/uptime)"
          #if [[ "${up%%.*}" -gt 120 ]]
-         #then DNS_SERVER=("$(_parse_JSON 'city' < <(./dnsleaktest.py -j ))")
+         #then DNS_SERVER=("$(_parse_JSON 'city' < <(./dnsleaktest.py -j ) | head -1)")
               #echo  "DNS server is in ${DNS_SERVER[0]}" |
               #tee >(_logger) >(_is_not_tty && _pia_notify) >/dev/null
               #sleep 3
          #fi
     fi
 
-  # the command for port forwarding was saved in /opt/etc/piavpn-manual/port_forward[-(user_added)].cmd
+  # request port for forwarding
     if [[ $PIA_PF != "true" ]]
     then
-  # print instructions for starting port forwarding later
+  # No, print instructions for starting port forwarding later
          echo -e "    To enable port forwarding run\n"
          echo -e "    $(< /opt/etc/piavpn-manual/port_forward"${cli}".cmd )"
          echo
@@ -176,7 +177,7 @@ done
          echo -e "\tIt WILL TIE UP A CONSOLE unless run in the background"
          echo
     else
-  # Start port_forward.sh
+  # Yes, start port_forward.sh
 
          tokenLocation=/opt/etc/piavpn-manual/token
          function _get_token() {
@@ -197,7 +198,9 @@ done
 
               mapfile -t tokenFile < "${tokenLocation}"
             # 2 steps with builtins vs. awk
-              month="${tokenFile[1]#* }"; month="${month%% *}"; month="$(m2n "${month}")"
+              month="${tokenFile[1]#* }"
+               month="${month%% *}"
+                month="$(m2n "${month}")"
               expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenFile[1]}"))"
 
             # compare iso dates
@@ -208,13 +211,13 @@ done
               else echo "token expired saving a new one to ${tokenLocation}"
             # day old, refresh 
                    _get_token \
-                      && mapfile -t tokenFile < "${tokenLocation}"
+                     && mapfile -t tokenFile < "${tokenLocation}"
               fi
 
          else 
        # get tokenFile
               _get_token \
-                 && mapfile -t tokenFile < "${tokenLocation}"
+                && mapfile -t tokenFile < "${tokenLocation}"
          fi
 
          if _is_set "${tokenFile[0]}"
@@ -224,15 +227,14 @@ done
 
             # allow post_up.sh to continue
 
-            # WG_SERVER_IP=${Host//_/.}=PF_GATEWAY  WG_HOSTNAME=$Domain=PF_HOSTNAME
                 echo " PIA_TOKEN=${tokenFile[0]} PF_GATEWAY=${Host//_/.} PF_HOSTNAME=${Domain} $(pwd)/port_forwarding.sh" |&
                 tee >(_logger) >/dev/null
 
               ( sleep 2
                 PIA_TOKEN="${tokenFile[0]}" PF_GATEWAY="${Host//_/.}" PF_HOSTNAME="${Domain}" "$(pwd)"/port_forwarding.sh >> /tmp/port_forward.log 2>&1
-              )>/dev/null & 
-              disown
-         else echo "Failed to get a valid token"
+              )>/dev/null 2>&1 & 
+              #disown
+         else echo "Failed to find a valid token"
               PIA_PF=false
          fi
     fi #

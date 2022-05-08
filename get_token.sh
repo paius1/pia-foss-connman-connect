@@ -31,7 +31,7 @@
 
   # Gui Notifications #
     [[ -z "${kodi_user}" ]] \
-       && source ./kodi_assets/functions #
+      && source ./kodi_assets/functions #
 
 # This function allows you to check if the required tools have been installed.
 check_tool() {
@@ -91,9 +91,13 @@ fi
          # https://stackoverflow.com/users/2318662/tharrrk #
          m2n() { printf '%02d' $((-10+$(sed 's/./\U&/g;y/ABCEGLNOPRTUVY/60AC765A77ABB9/;s/./+0x&/g'<<<${1#?}) ));} #
 
-         tokenExpiration="$(awk 'NR==2{print $0; exit}' /opt/etc/piavpn-manual/token)" #
-         month="$(m2n "$(awk '{print $2}' <<< "${tokenExpiration}")")" #
-         expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenExpiration}"))" #
+              mapfile -t tokenFile <  /opt/etc/piavpn-manual/token
+            # 2 steps with builtins vs. awk
+              month="${tokenFile[1]#* }"
+               month="${month%% *}"
+                month="$(m2n "${month}")"
+              expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenFile[1]}"))"
+
          if (( $(date -d "+30 min" +%s) < $(date -d "${expiry_iso}" +%s) )) #
          then echo "Previous token OK!" #
        # less than 24hrs old #

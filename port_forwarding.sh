@@ -36,7 +36,7 @@
     portfile='/tmp/port.dat' #
 
     [[ -z "${kodi_user}" ]] \
-       && source ./kodi_assets/functions #
+      && source ./kodi_assets/functions #
 
 # DEBUGGING
 #LOG="${LOG:-/tmp/pia-wireguard.log}"

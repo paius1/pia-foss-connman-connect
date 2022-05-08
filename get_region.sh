@@ -31,7 +31,7 @@
 
   # Gui Notifications #
     [[ -z "${kodi_user}" ]] \
-       && source ./kodi_assets/functions #
+      && source ./kodi_assets/functions #
 
 # DEBUGGING # systemd logs to journal env LOG=/dev/null
 #LOG="${LOG:-/tmp/pia-wireguard.log}"
@@ -161,7 +161,7 @@ printServerLatency() {
   serverIP=$1
   regionID=$2
 
-            # increased --connect-timeout by 1 to get any no 0 replies #
+            # increased --connect-timeout by 1 to get replies #
               local connect_timeout=$(echo "${MAX_LATENCY} 1}" | awk '{print $1 + $2}') #
 
   regionName="$(echo "${@:3}" |
@@ -308,7 +308,7 @@ if [[ -z $PIA_TOKEN ]]; then
     exit 0
   fi
   ./get_token.sh
-  PIA_TOKEN=$( awk 'NR == 1' /opt/etc/piavpn-manual/token ) #
+        read -r PIA_TOKEN</opt/etc/piavpn-manual/token
   export PIA_TOKEN
 # dont delete, can reuse for 24 hours #
 #rm -f /opt/etc/piavpn-manual/token #
