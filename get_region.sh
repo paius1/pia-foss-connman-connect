@@ -162,7 +162,8 @@ printServerLatency() {
   regionID=$2
 
             # increased --connect-timeout by 1 to get replies #
-              local connect_timeout=$(echo "${MAX_LATENCY} 1}" | awk '{print $1 + $2}') #
+              local connect_timeout #
+              connect_timeout=$(echo "${MAX_LATENCY} 1}" | awk '{print $1 + $2}') #
 
   regionName="$(echo "${@:3}" |
     sed 's/ false//' | sed 's/true/(geo)/')"

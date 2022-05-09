@@ -59,12 +59,12 @@
 #echo "Starting $(pwd)/${BASH_SOURCE##*/}" | tee >(_logger) #
 
   # How was this script called [systemd|favourites|interactively] #
-  # systemd: continue #
-  # favourites: pia-wireguard.service exist? #
-  #             YES: (re)start service #
-  #             NO: set logfile and continue #
-  # interactively: set PRE_UP_RUN to cli #
-  # 
+      # systemd: continue #
+      # favourites: pia-wireguard.service exist? #
+      #             YES: (re)start service #
+      #             NO: set logfile and continue #
+      # interactively: set PRE_UP_RUN to cli #
+      # 
     if _is_unset PRE_UP_RUN \
          &&
        _is_not_tty \
@@ -92,9 +92,9 @@
          esac #
 
          systemd-cat -t pia-wireguard.favourites -p notice < \
-                    <(echo "${action}tarted pia-wireguard.service" |&
+                    <(echo "${action} pia-wireguard.service" |&
        # log this to systemd journal and pia-wireguard log #
-                      tee >(LOG=/tmp/pia-wireguard.log _logger "${action} pia-wireguard.service" >/dev/null)) #
+                      tee >(LOG=/tmp/pia-wireguard.log _logger) >/dev/null) #
          exit 0 #
 
     elif _is_unset PRE_UP_RUN \
@@ -125,7 +125,7 @@
                      systemd-cat -t pia-wireguard.cmdline -p notice < \
                                  <(echo "Stopping pia-wireguard.service from the command line" |&
                    # log this to systemd journal an log #
-                                   tee -i >(_logger >/dev/null)) #
+                                   tee -i >(_logger) >/dev/null) #
 
                    # Stop pia-wireguard service #
                      systemctl stop pia-wireguard.service & #
@@ -184,12 +184,12 @@
     fi #
 
   # system maintanence for day old backup files
-    find /opt/etc/piavpn-manual/wireguard_json* -name '*.cmd*' -mmin +1440 -delete > /dev/null
     find /opt/etc/wireguard/ -name '*.conf~' -mmin +1440 -delete > /dev/null
     find /storage/.config/wireguard/ -name '*.config~' -mmin +1440 -delete > /dev/null
 
   # changes in .env file? # NOTE to self when disconnecting touch pia.config to reset creation time
-    # none and pia.config is < 24hrs old, skip to ./post_up.sh #
+      # none and pia.config is < 24hrs old, skip to ./post_up.sh #
+      # pia.config is > 24hrs old, reuse...skip to ./connect_to_wi....sh #
     if _is_not_tty \
          &&
        [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
@@ -201,6 +201,7 @@
        # .env is unchanged #
 
               age_pia_config="$(_interval "$(_created /storage/.config/wireguard/pia.config)")" #
+
               if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
               then _logger "    pia.config last connected $(_hmmss "${age_pia_config}") ago" #
             # wireguard/pia.config is less that 24 hours old   #
@@ -215,6 +216,24 @@
 
               else _logger "Creating fresh pia.config" #
             # day old config #
+                 # pass old pia.config to connect_to_wireguard...sh
+                 # skip get_token and get_region
+                   declare Host Domain
+                   eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia"${cli}".config |
+                                sed 's/\./_/;s/ = \(.*\)$/="\1"/g')"
+
+                   PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" ./get_token.sh
+                 # pass same variables as a complete run
+                   read -r PIA_TOKEN </opt/etc/piavpn-manual/token #
+                   PIA_DNS="${PIA_DNS:-true}"
+                   export PIA_TOKEN PIA_DNS 
+
+                   WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" ./connect_to_wireguard_with_token.sh
+
+                   exit 0
+
+                   #rm -v /opt/etc/wireguard/pia.conf
+                   #rm -v /storage/.config/wireguard/pia.config
               fi #
 
          else _logger "      .env file has changed, running thru setup" #
@@ -261,7 +280,7 @@
        # ensure AUTOCONNECT is set, and go from there #
          AUTOCONNECT="${AUTOCONNECT:-false}" #
 
-          if [[ "${AUTOCONNECT}" =~ ^[t|T] ]] #
+          if [[ -z "${AUTOCONNECT##[t|T]*}" ]] #
           then  #
         # check PREFERRED_REGION #
                if _is_set "${PREFERRED_REGION}" #
@@ -620,16 +639,17 @@ For example, you can try 0.2 for 200ms allowed latency.
         break
               # running non-interactively got ordered list choosing fastest #
                 else # choose best region and proceed #
-                     PREFERRED_REGION=$( awk 'NR == 1 {print $2}' /opt/etc/piavpn-manual/latencyList ) # 
-                     REGION="$(/opt/bin/jq -r '.name' < /opt/etc/piavpn-manual/regionData )" #
+                     read -r line</opt/etc/piavpn-manual/latencyList #
+                     PREFERRED_REGION=$([[ "$line" =~ [[:space:]]([^[:space:]]*) ]] && echo "${BASH_REMATCH[0]}" ) #
+                     REGION="$( _parse_JSON 'name' < /opt/etc/piavpn-manual/regionData )" #
                      export PREFERRED_REGION #
-                     echo 'Selected for '"${REGION}"'' |
+                     echo 'Selected for '"${REGION}"'' |& #
                      tee >(_logger) >(_pia_notify) >/dev/null #
                 fi #
       else # [[ ! -s /opt/etc/piavpn-manual/latencyList ]]
 
            if _is_not_tty #
-           then echo "No Available Servers Found!" |
+           then echo "No Available Servers Found!" |& #
          # RUNNING NON-INTERACTIVELY #
                 tee >(_logger) >(_pia_notify "${BOTHER}") >/dev/null #
            fi #

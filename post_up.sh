@@ -39,22 +39,36 @@
   # by moving actual connection out of connect_to_w...sh
   # we lose $AUTOCONNECT etal, $SERVICE, $REGION_NAME, etc.
 
-    function check_vars() { # https://stackoverflow.com/users/6590128/bromate
+    function check_vars() {
         local var_names=("$@")
-        
+        local nl var_name
+        declare -a env
+
+        mapfile -t env < .env
+        nl=$'\n'
+
         echo -n "SET "
             for var_name in "${var_names[@]}"
-            do  if _is_empty "${!var_name}"
-                then eval "$(awk '/'"${var_name}"'=/ {print}' .env)"
-                     echo -n "${var_name}=${!var_name} "
-                fi
+            do if _is_empty "${!var_name}"
+               then match=".*${var_name}="
+                    while read -r line
+                    do if [[ "${line}" =~ ${match}[^${nl}]* ]]
+                       then eval "${BASH_REMATCH[0]}"
+                            if _is_set "${!var_name}"
+                            then echo -n "$var_name=${!var_name} "
+                                 break
+                            fi
+                       fi
+                    done < <(printf '%s\n' "${env[@]}" )
+               fi
             done
         echo "from .env file"
  }
 
-  # variables set in normal run_setup.sh call
+  # variables set in normal run_setup.sh call if unset check .env file
     check_vars AUTOCONNECT PIA_PF PIA_DNS
-    
+
+  # same as run_setup.sh
     AUTOCONNECT="${AUTOCONNECT:-false}"
     PIA_PF="${PIA_PF:-false}"
     PIA_DNS="${PIA_DNS:-true}"

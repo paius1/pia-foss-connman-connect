@@ -157,11 +157,11 @@ echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
     if _is_tty \
          &&
        [[ -s /opt/etc/wireguard/pia.conf ]] #
-    then printf '%s\n' "exists, overwrite? ([Y]es/[n]o): " #
+    then printf '%s\n' "exists, overwrite? ([N]o/[y]es): " #
   # overwrite existing pia.conf running interactively #
   # (default is Yes, No to add -cli to filename #
          read -r continue #
-         if grep -iq n <<< "${continue:0:1}" #
+         if [[ ! "${continue}" =~ ^[y|Y] ]] #
          then plus='-cli' #
        # NO, add '-cli' to file name #
               echo -n "writing to /opt/etc/wireguard/pia${plus}.conf..."
@@ -200,7 +200,7 @@ echo -e "${green}OK!${nc}"
     then printf '%s\n' "exists, overwrite? ([N]o/[y]es): " #
   # overwrite existing pia.config running interactively? #
          read -r continue #
-         if grep -iq -v y <<< "${continue:0:1}" #
+         if [[ ! "${continue}" =~ ^[y|Y] ]] #
          then cli='-(user_added)' #
        # NO, add '-(user added)' #
               echo -n "writing to /storage/.config/wireguard/pia${cli}.config..."
@@ -214,7 +214,7 @@ echo -e "${green}OK!${nc}"
   # read pia${plus}.conf into variables #
     declare Address PrivateKey PersistentKeepalive PublicKey AllowedIPs Endpoint #
     eval "$(grep -e '^[[:alpha:]]' /opt/etc/wireguard/pia"${plus}".conf | sed 's| = |=|')" #
-    REGION_NAME="$(/opt/bin/jq -r '.name' /opt/etc/piavpn-manual/regionData)" #
+    REGION_NAME="$(_parse_JSON 'name' < /opt/etc/piavpn-manual/regionData)" #
 
   # write wireguard config #
     cat <<-EOF > /storage/.config/wireguard/pia"${cli}".config
@@ -254,7 +254,7 @@ echo -e "${green}OK!${nc}"
        [[ "${AUTOCONNECT}" = "true" ]] #
     then echo "CONNMAN service ${SERVICE}! is ready" |& #
   # Skip to ./post_up.sh #
-         tee -i >(_logger ) # >(_pia_notify ) >/dev/null #
+         tee -i >(_logger ) >/dev/null # >(_pia_notify ) >/dev/null #
          #sleep 1 #
 
     else #
@@ -265,7 +265,8 @@ echo -e "${green}OK!${nc}"
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
               read -r connect #
               echo #
-              if echo "${connect:0:1}" | grep -iq n #
+
+              if [[  "${connect}" =~ [n|N] ]] #
               then _print_connection_instructions #
             # don't connect
                    exit 0 #
@@ -296,7 +297,7 @@ echo -e "${green}OK!${nc}"
             0|true)  printf "pia-wireguard service is running, continue? ([N]o/[y]es): " #
                    # stop? #
                      read -r continue #
-                     if grep -iq -v y <<< "${continue:0:1}" #
+                     if [[ ! "${continue}" =~ ^[y|Y] ]] #
                    # NO #
                      then echo "Goodbye" #
                           _print_connection_instructions #
