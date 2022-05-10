@@ -160,12 +160,14 @@ echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
     then printf '%s\n' "exists, overwrite? ([N]o/[y]es): " #
   # overwrite existing pia.conf running interactively #
   # (default is Yes, No to add -cli to filename #
+         shopt -s nocasematch
          read -r continue #
-         if [[ ! "${continue}" =~ ^[y|Y] ]] #
+         if [[ "${continue}" != *"y"* ]] #
          then plus='-cli' #
        # NO, add '-cli' to file name #
               echo -n "writing to /opt/etc/wireguard/pia${plus}.conf..."
          fi #
+         shopt -u nocasematch
     fi #
 
 echo "
@@ -199,14 +201,17 @@ echo -e "${green}OK!${nc}"
        [[ -s /storage/.config/wireguard/pia.config ]] #
     then printf '%s\n' "exists, overwrite? ([N]o/[y]es): " #
   # overwrite existing pia.config running interactively? #
+         shopt -s nocasematch
          read -r continue #
-         if [[ ! "${continue}" =~ ^[y|Y] ]] #
+         if [[ "${continue}" != *"y"* ]] #
          then cli='-(user_added)' #
        # NO, add '-(user added)' #
+
               echo -n "writing to /storage/.config/wireguard/pia${cli}.config..."
               export cli #
             # export for post_up.sh #
          fi #
+         shopt -u nocasematch
     fi #
 
   # convert wireguard .conf to connman .config #
@@ -262,11 +267,13 @@ echo -e "${green}OK!${nc}"
          if _is_tty #
          then echo -e "\nCONNMAN service ${SERVICE}! is ready" #
        # running interactively
+
               echo -n "    Do you wish to connect now([Y]es/[n]o): " #
+              shopt -s nocasematch
               read -r connect #
               echo #
 
-              if [[  "${connect}" =~ [n|N] ]] #
+              if [[ "${connect}" != *"n"* ]] #
               then _print_connection_instructions #
             # don't connect
                    exit 0 #
@@ -276,6 +283,7 @@ echo -e "${green}OK!${nc}"
                  # proceed with connection
                    export CONNMAN_CONNECT=true
               fi #
+              shopt -u nocasematch
          else _print_connection_instructions #
        # running non-interactively, log and Gui.Notifications #
               exit 0 #
@@ -296,8 +304,10 @@ echo -e "${green}OK!${nc}"
           # systemd service active #
             0|true)  printf "pia-wireguard service is running, continue? ([N]o/[y]es): " #
                    # stop? #
+
+                     shopt -s nocasematch
                      read -r continue #
-                     if [[ ! "${continue}" =~ ^[y|Y] ]] #
+                     if [[ "${continue}" != *"y"* ]] #
                    # NO #
                      then echo "Goodbye" #
                           _print_connection_instructions #
@@ -312,6 +322,7 @@ echo -e "${green}OK!${nc}"
                         # This runs ./shutdown.sh which should mirror ./pre_up.sh #
                         # i.e disconnecting, iptables, DNS, port_forward.sh,stops apps #
                      fi # 
+                     shopt -u nocasematch
                    ;; #
             *|false) echo "pia-wireguard service is not running" #
           # sally forth #

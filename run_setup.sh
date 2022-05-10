@@ -117,10 +117,12 @@
        # systemd service active #
             0|true)  printf "pia-wireguard service is running\n"
                      printf "this will interfere with server selection, continue? ([N]o/[y]es): " #
+                     shopt -s nocasematch
                      read -r continue #
-                     grep -iq -v 'y' <<< "${continue:0:1}" \
-                     && { echo "Goodbye";
-                          exit 0; } #
+                     [[ "${continue}" != *"y"* ]] \
+                       && { echo "Goodbye";
+                             exit 0; } #
+                     shopt -u nocasematch
 
                      systemd-cat -t pia-wireguard.cmdline -p notice < \
                                  <(echo "Stopping pia-wireguard.service from the command line" |&
@@ -164,7 +166,7 @@
       #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
 
   # ConditionFileNotEmpty=.env #
-    # systemd check for non empty .env file #
+      # systemd fails on empty .env file #
     if [[ -s .env ]] #
     then _logger "Load .env file" #
   # read variables from .env file #
@@ -184,6 +186,7 @@
     fi #
 
   # system maintanence for day old backup files
+    find /opt/etc/piavpn-manual/ -name 'wireguard_json-*' -mmin +1440 -delete > /dev/null
     find /opt/etc/wireguard/ -name '*.conf~' -mmin +1440 -delete > /dev/null
     find /storage/.config/wireguard/ -name '*.config~' -mmin +1440 -delete > /dev/null
 
@@ -641,8 +644,8 @@ For example, you can try 0.2 for 200ms allowed latency.
                 else # choose best region and proceed #
                      read -r line</opt/etc/piavpn-manual/latencyList #
                      PREFERRED_REGION=$([[ "$line" =~ [[:space:]]([^[:space:]]*) ]] && echo "${BASH_REMATCH[0]}" ) #
-                     REGION="$( _parse_JSON 'name' < /opt/etc/piavpn-manual/regionData )" #
                      export PREFERRED_REGION #
+                     REGION="$( _parse_JSON 'name' < /opt/etc/piavpn-manual/regionData )" #
                      echo 'Selected for '"${REGION}"'' |& #
                      tee >(_logger) >(_pia_notify) >/dev/null #
                 fi #
@@ -756,5 +759,5 @@ echo -e "${green}PIA_DNS=$PIA_DNS${nc}"
 CONNECTION_READY="true"
 export CONNECTION_READY
 
-  # added IVE_RUN to supress notify_kodi #
+  # added IVE_RUN to supress _pia_notify #
     IVE_RUN=2 ./get_region.sh 2>/dev/null #
