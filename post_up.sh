@@ -66,7 +66,7 @@
  }
 
   # variables set in normal run_setup.sh call if unset check .env file
-    check_vars AUTOCONNECT PIA_PF PIA_DNS
+    check_vars AUTOCONNECT PIA_PF PIA_DNS WG_FIREWALL
 
   # same as run_setup.sh
     AUTOCONNECT="${AUTOCONNECT:-false}"
@@ -124,7 +124,7 @@
        ((n++)) 
        echo "connection tries = ${n}"
        [[ "${n}" -ge 5 ]] && break
-       sleep 1
+       sleep 0.3
        readarray -t services < <(connmanctl services)
        [[ "${services[0]}" =~ (vpn_.*)$ ]]
 done
@@ -146,7 +146,7 @@ done
        # or not #
               echo 'Connected to '"${REGION_NAME}"' ' |
               tee >(_logger ) >(_pia_notify 5000 'pia_on_48x48.png' ) >/dev/null #
-              sleep 3 # for notification
+#              sleep 3 # for notification
          fi
     else
   # FAILURE
@@ -159,7 +159,7 @@ done
     then
   # Check and reset nameservers set by connmanctl
          mapfile -t resolv_conf < /run/connman/resolv.conf
-         [[ "${resolv_conf[@]}" =~ nameserver[[:blank:]]*(([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}) ]]
+         [[ "${resolv_conf[*]}" =~ nameserver[[:blank:]]*(([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}) ]]
          if [[ "${BASH_REMATCH[1]}" != "${WireGuard_DNS}" ]]
          then _logger "Replacing Connman's DNS with PIA's DNS"
        # connman subordinates vpn dns to any preset nameservers
@@ -240,7 +240,7 @@ done
          fi
 
          if _is_set "${tokenFile[0]}"
-         then echo "    logging port_forwarding${cli}.cmd to /tmp/port_forward.log" |&
+         then echo "    logging port_forwarding to /tmp/port_forward.log" |&
        # have token, proceed with ./port_forwarding.sh
               tee >(_logger) >/dev/null
 
