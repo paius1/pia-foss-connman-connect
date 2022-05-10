@@ -111,7 +111,6 @@
               non_vpn=("$( printf '%s\n' "${services[@]}" | grep -v 'vpn_' )")
 
             # get nameserver from first active non vpn_ interface settings
-              #mapfile -d ' ' NS < <(awk -F'[=|;]' '/^Nameserver/{printf "%s", $2}' ~/.cache/connman/"${non_vpn[0]##* }"/settings)
               
               nl=$'\n'
               mapfile -t settings<~/.cache/connman/"${non_vpn[0]##* }"/settings
@@ -141,7 +140,7 @@
         then _logger "Interwebs failed after half a minute"
        # wait 30 seconds and exit, using $count as exit status
        # this stops systemd
-             break
+             exit "${count}"
         fi
     done
     count=0
