@@ -72,14 +72,15 @@
         date="$(TZ="${TZ[-1]%%,*}" /opt/bin/date)"
 
       # running non-interactively but not from systemd: print to stdout and $log
-        _is_unset PRE_UP_RUN \
-          &&
-        printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${message}" $'\n'| tee -a "${log}" \
-          ||
-        echo "${message}"
-      # send message to stdout
-        #systemd-cat -t pia-wireguard -p warning <<< "${message}"
-      # to systemd journal
+        if _is_unset PRE_UP_RUN
+        then while IFS= read -r line
+      # print | tee to logfile
+             do
+                printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${line}" $'\n' | tee -a "${log}"
+             done <<< "$message"
+
+        else echo "${message}"
+        fi
     }
   export -f _logger
 
