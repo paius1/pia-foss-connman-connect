@@ -195,8 +195,8 @@
 
        # ip of vpn: remove prefix vpn_, suffix _${Domain}, & replace '_' > '.'
          s3d="${wg_0#*_}"
-         s2d="${s3d%_*}"
-         ip_flush="${s2d//_/.}"
+         s3d2="${s3d%_*}"
+         ip_flush="${s3d2//_/.}"
 
        # remove from the routing table
          ip route flush "${ip_flush}" 
