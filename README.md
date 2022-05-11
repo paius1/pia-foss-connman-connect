@@ -35,8 +35,8 @@ then
   
   and follow the prompts.
   
-  You should end up with a pia.config file in ~/.config/wireguard/pia.config,
-  and can connect by going to Settings>CoreELEC>Connections
+  You should end up with a pia.config file in /storage/.config/wireguard/pia.config,
+  and can connect by going to Settings >CoreELEC >Connections
 
 
 
@@ -59,17 +59,17 @@ to run as a service you need to:
                                 # run PIA_PF='true|false' /path/to/scripts/get_region.sh
                                 # for valid options
 #### &emsp;optional: some are not part of pia-foss, and must be exported
-               PIA_PF='true|false'
-               PIA_DNS='true|false'
+               PIA_PF='true|false'    (default false)
+               PIA_DNS='true|false'   (default true)
                #export CONNMAN_CONNECT='true' # overcomes AUTOCONNECT's limitation,
-                                             # and is set true by systemd
+                                              # and is set true by systemd
                #export MY_FIREWALL=/path/to/normal/iptables-save.file
                #export WG_FIREWALL=/path/to/wireguard/iptables-save.file
                
   
 ####  &emsp;Edit:
   
-&emsp;&emsp;pia-wireguard.service file &ensp;&ensp;&ensp;&ensp;&ensp;Replace /path/to/scripts with the actual path to scripts  
+&emsp;&emsp;pia-wireguard.service file &ensp;&ensp;&ensp;&ensp;&ensp;Change **/path/to/scripts** to actual path  
   
 &emsp;&emsp;pre_up.sh&emsp;&emsp;&emsp;add any vpn dependent applications  
 &emsp;&emsp;post_up.sh&nbsp;&emsp;&emsp; you need to start/stop,  
@@ -93,7 +93,7 @@ to run as a service you need to:
 ```
 #  To run from kodi Favourites:
    from pia-foss-connman-connect/kodi_assets/  
-&emsp;&emsp;copy the xml in add_to_favourites.xml to ~/.kodi/userdate/favourites.xml  
+&emsp;&emsp;copy the xml in add_to_favourites.xml to /storage/.kodi/userdate/favourites.xml  
 &emsp;&emsp;change the paths to the scripts and thumbnails i.e. .png files  
 &emsp;&emsp;set kodi user, password, host, and port in kodi_assets/functions  
 
