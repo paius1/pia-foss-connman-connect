@@ -152,7 +152,7 @@ echo -n "Trying to write /opt/etc/wireguard/pia.conf..."
           # changed path #
             mkdir -p /opt/etc/wireguard #
 
-  # Verify overwriting system generated file from shell #
+  # Verify overwriting system generated file from tty #
   # appended  '-cli'? #
     if _is_tty \
          &&
@@ -194,7 +194,7 @@ echo -e "${green}OK!${nc}"
 
     echo -n "Trying to write connman pia.config..." #
 
-  # Verify overwriting system generated file from shell #
+  # Verify overwriting system generated file from tty #
   # default append '-(user_added)'? #
     if _is_tty \
          &&
@@ -273,7 +273,7 @@ echo -e "${green}OK!${nc}"
               read -r connect #
               echo #
 
-              if [[ "${connect}" != *"n"* ]] #
+              if [[ "${connect}" == *"n"* ]] #
               then _print_connection_instructions #
             # don't connect
                    exit 0 #
