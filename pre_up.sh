@@ -143,7 +143,7 @@
              exit "${count}"
         fi
     done
-    count=0
+
     _logger "Have full network access"
 
   # port forwarding cleanup
@@ -160,4 +160,4 @@
 
 ################ Add other applications to stop below #################
 #
-exit "${count}"
+exit 0
