@@ -48,7 +48,7 @@
         read -t 0 \
           && new_1=$(</dev/stdin)
 
-      # append to parameters
+      # prepend to parameters
         _is_empty "${new_1}" \
           || set -- "${new_1}" "${@:1:2}"
       #
@@ -64,7 +64,7 @@
         source="${3:-$(caller)}"
 
       # align messages
-        tab=$((${#source}+1))
+        tab=$((${#source}+4))
         IFS="" spaces="$(printf "%$((tab*2))s")"
 
       # proper timestamps
@@ -76,7 +76,7 @@
         then while IFS= read -r line
       # print | tee to logfile
              do
-                printf %s:[%s]:%.$((${tab}-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${line}" $'\n' | tee -a "${log}"
+                printf %s:[%s]:%.$((tab-${#source}))s%s%s  "${date}" "$(cut -d- -f2- <<< "${source##*/}") " "${spaces} " "${line}" $'\n' | tee -a "${log}"
              done <<< "$message"
 
         else echo "${message}"
@@ -110,9 +110,6 @@
         sleep 0.01
 
       # there is something in stdin put it in ${@:1}
-        #if test ! -t 0; then
-         #   set -- "$(cat <&0 & wait)" "${@:1:2}"
-        #fi
         read -t 0 \
            && new_1="$( </dev/stdin)"
 
@@ -164,7 +161,7 @@
     
         now="$(printf '%(%s)T' |
                tee "${2:-/dev/null}")"
-        echo -n "$((now-${th3n}))"
+        echo -n "$((now-th3n))"
     return 0
  }
     export -f _interval
