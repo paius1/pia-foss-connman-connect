@@ -35,8 +35,8 @@
     #exec > >(tee -a $LOG) #2>&1
 
   # CHECK FOR SYSTEM STARTUP
-    up="$(</proc/uptime)"
-    if [[ "${up%%.*}" -lt 60 ]]
+    read -r -d. up </proc/uptime
+    if [[ "${up}" -lt 60 ]]
     then _logger "System Startup, waiting..."
   # system has just started wait, save a copy of resolv.conf and the routing table
          sleep 1
@@ -66,9 +66,9 @@
     then _logger "$(connmanctl disconnect "${wg_0}")"
   # vpn active, disconnect
 
-       # reset pia.config's age
          readarray -t wg_0_file < <(grep -l --exclude='~$' "${wg_0##*_}" /storage/.config/wireguard/*.config 2>/dev/null)
-         touch "${wg_0_file[$([[ ${PRE_UP_RUN} == *"t"* ]] && echo 1 || echo 0)]}" 2>/dev/null
+       # reset pia.config age
+         touch "${wg_0_file[*]}" 2>/dev/null
 
          if _is_not_tty
          then
@@ -126,6 +126,7 @@
     nameserver "${settings[1]:-208.67.222.220}"
 	EOF
          fi
+         else _logger "Can resolve hostnames"
     fi
 
   # timeout for systemd's sake
@@ -143,6 +144,7 @@
        # this stops systemd
              exit "${count}"
         fi
+        _logger "Still waiting for full network access"
     done
 
     _logger "Have full network access"
