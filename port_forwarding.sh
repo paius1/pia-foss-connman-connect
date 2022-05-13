@@ -95,23 +95,72 @@ fi
   # An error with no recovery logic occured #
     fatal_error () { #
         local port="${1}" #
-        echo "Fatal error::port_forwarding.sh" |
-        tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') >/dev/null #
-         sleep 10 #
+
+        echo "Fatal error::port_forwarding.sh" |& #
+        tee >(_logger) >(_pia_notify 6000 'pia_off_48x48.png') >/dev/null #
+         sleep 6 #
 
       # remove port from iptables #
         iptables -D INPUT -p tcp --dport "${port}" -j ACCEPT #
 
-        echo "Attempting restart of port forwarding" |
+        echo "Attempting restart of port forwarding" |& #
         tee >(_logger) >(_pia_notify 5000 'pia_off_48x48.png') >/dev/null  #
-        sleep 15 #
+
+         function _get_token() { #
+             if PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" "$(pwd)"/get_token.sh #
+             then return 0 #
+             else return 1 #
+             fi #
+         } #
+
+         if [[ -s "${tokenLocation:=/opt/etc/piavpn-manual/token}" ]] #
+         then #
+       # have tokenFile #
+            # check expiry
+            # https://stackoverflow.com/users/2318662/tharrrk
+              m2n() { printf '%02d' $((-10+$(sed 's/./\U&/g;y/ABCEGLNOPRTUVY/60AC765A77ABB9/;s/./+0x&/g'<<<${1#?}) ));} #
+
+              mapfile -t tokenFile < "${tokenLocation}" #
+              month="${tokenFile[1]#* }" #
+               month="${month%% *}" #
+                month="$(m2n "${month}")" #
+              expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenFile[1]}"))" #
+
+            # compare iso dates #
+              if (( $(date -d "+30 min" +%s) < $(date -d "${expiry_iso}" +%s) )) #
+              then echo "Previous token OK!" #
+            # less than 24hrs old #
+
+              else echo "token expired saving a new one to ${tokenLocation}" #
+            # day old, refresh  #
+                   unset tokenFile #
+                   _get_token \
+                     && mapfile -t tokenFile < "${tokenLocation}" #
+              fi #
+
+         else #
+       # get token #
+              _get_token \
+                && mapfile -t tokenFile < "${tokenLocation}" #
+         fi
+
+         if _is_set "${tokenFile[0]}" #
+         then echo "    logging port_forwarding to /tmp/port_forward.log" |&
+       # have token, proceed with ./port_forwarding.sh #
+              tee >(_logger) >/dev/null #
     
-        PIA_TOKEN=$PIA_TOKEN PF_GATEWAY=$PF_GATEWAY PF_HOSTNAME=$PF_HOSTNAME \
-        ./port_forwarding.sh > /tmp/port_forward.log & disown #
-        exit 1 #
+        PIA_TOKEN="${tokenFile[0]}" PF_GATEWAY="${PF_GATEWAY}" PF_HOSTNAME="${PF_HOSTNAME}" \
+        "$(pwd)"/port_forwarding.sh > /tmp/port_forward.log & #
+         disown #
+         else echo "Port Forwarding failed" |& #
+              tee >(_logger) >(_pia_notify) >/dev/null #
+              exit 1 #
+         fi #
+
+        exit 0 #
  } #
 
-  # Handle shutdown behavior
+  # Handle shutdown #
     finish () { #
         _logger < <( echo "Port forward stopped. The port close soon." |
         tee >(systemctl --quiet is-active  pia-wireguard.service && _pia_notify 5000 'pia_off_48x48.png' ) ) #
@@ -124,7 +173,7 @@ fi
 
         exit 0 #
  }
-    trap 'finish' SIGTERM SIGINT SIGQUIT #
+    trap finish SIGTERM SIGINT SIGQUIT #
 
   # replace any currently running port_forwarding.sh's #
     pids=($(pidof port_forwarding.sh)) #
@@ -136,12 +185,12 @@ fi
          
          for i in "${!pids[@]}" #
          do if [ "${pids[$i]}" == "$mypid" ] #
-            then unset pids[$i] #
+            then unset pids["${i}"] #
             fi #
          done #
 
        # kill the remainders
-         echo "${pf_pids[@]}" |
+         echo "${pids[@]}" |
          xargs -d $'\n' sh -c 'for pid do kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null; done' _ #
     fi #
 
