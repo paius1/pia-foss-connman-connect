@@ -67,10 +67,11 @@
   # vpn active, disconnect
 
        # reset pia.config's age
-         touch "${wg_0_file}" 2>/dev/null
+         readarray -t wg_0_file < <(grep -l --exclude='~$' "${wg_0##*_}" /storage/.config/wireguard/*.config 2>/dev/null)
+         touch "${wg_0_file[$([[ ${PRE_UP_RUN} == *"t"* ]] && echo 1 || echo 0)]}" 2>/dev/null
 
          if _is_not_tty
-         then readarray -t wg_0_file < <(grep -l --exclude='~$' "${wg_0##*_}" /storage/.config/wireguard/*.config 2>/dev/null)
+         then
        # GUI notification
 
             # pia filename containing wg0's region name

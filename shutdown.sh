@@ -83,7 +83,7 @@
                      disown
                      exit 0
                 ;;
-            *|false) PRE_UP_RUN='cli'
+            *|false) export PRE_UP_RUN='cli'
           # carry on
                 ;;
          esac
@@ -101,19 +101,20 @@
     then _logger "$(connmanctl disconnect "${wg_0}")"
   # vpn active
 
+         readarray -t wg_0_file < <(grep -l --exclude='~$' "${wg_0##*_}" /storage/.config/wireguard/*.config 2>/dev/null)
+       # reset pia.config age which one!? HACK
+         touch "${wg_0_file[$({ [[ ${PRE_UP_RUN} == *"t"* ]] && echo 1; } || echo 0)]}" 2>/dev/null
+
          if _is_not_tty
-         then  readarray -t wg_0_file < <(grep -l --exclude='~$' "${wg_0##*_}" /storage/.config/wireguard/*.config 2>/dev/null)
+         then
        # GUI notification
 
             # pia filename containing wg0's region name
-              [[ "$(<"${wg_0_file[0]}")" =~ Name.*\[(.*)\] ]]
+              [[ "$(<"${wg_0_file[-1]}")" =~ Name.*\[(.*)\] ]]
               REGION_NAME="${BASH_REMATCH[1]:-}"
 
               _pia_notify 'Disconnected from '"${REGION_NAME:-vpn}"' ' 5000 "pia_off_48x48.png"
          fi
-
-       # reset pia.config age which one!? HACK
-         touch "${wg_0_file[-1]}"
 
     else _logger "No current vpn connection"
   # NO
@@ -199,8 +200,8 @@
          ip_flush="${s3d2//_/.}"
 
        # remove from the routing table
-         ip route flush "${ip_flush}" 
-         _logger "Flushed vpn ${ip_flush} from routing table"
+         ip route flush "${ip_flush}" \
+           && _logger "Flushed vpn ${ip_flush} from routing table"
     fi
 
 # add anything else such stopping applications and port forwarding
