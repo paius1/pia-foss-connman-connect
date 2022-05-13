@@ -102,8 +102,8 @@
   # vpn active
 
          readarray -t wg_0_file < <(grep -l --exclude='~$' "${wg_0##*_}" /storage/.config/wireguard/*.config 2>/dev/null)
-       # reset pia.config age which one!? HACK
-         touch "${wg_0_file[$({ [[ ${PRE_UP_RUN} == *"t"* ]] && echo 1; } || echo 0)]}" 2>/dev/null
+       # reset pia.config age
+         touch "${wg_0_file[*]}" 2>/dev/null
 
          if _is_not_tty
          then
