@@ -196,7 +196,7 @@
     if _is_not_tty \
          &&
        [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
-    then _logger "    Checking current .env file with previous" #
+    then _logger "Checking current .env file with previous" #
   # not running interactively, have checksum for .env #
 
          if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
@@ -217,10 +217,10 @@
                     # call ./post_up.sh & exit for favourites #
                    esac #
 
-              else _logger "Creating fresh pia.config" #
+              else _logger "Refreshing pia.config" #
             # day old config #
-                 # pass old pia.config to connect_to_wireguard...sh
-                 # skip get_token and get_region
+                 # pass old pia.config and .env to connect_to_wireguard...sh
+                 # skips get_region.sh
                    declare Host Domain
                    eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia"${cli}".config |
                                 sed 's/\./_/;s/ = \(.*\)$/="\1"/g')"
@@ -228,15 +228,14 @@
                    PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" ./get_token.sh
                  # pass same variables as a complete run
                    read -r PIA_TOKEN </opt/etc/piavpn-manual/token #
+                   AUTOCONNECT="${AUTOCONNECT:-false}"
                    PIA_DNS="${PIA_DNS:-true}"
-                   export PIA_TOKEN PIA_DNS 
+                   PIA_PF="${PIA_PF:-false}"
+                   export PIA_TOKEN AUTOCONNECT PIA_DNS PIA_PF
 
                    WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" ./connect_to_wireguard_with_token.sh
 
                    exit 0
-
-                   #rm -v /opt/etc/wireguard/pia.conf
-                   #rm -v /storage/.config/wireguard/pia.config
               fi #
 
          else _logger "      .env file has changed, running thru setup" #
@@ -247,7 +246,7 @@
     elif [[ ! -s /opt/etc/piavpn-manual/sha1sum.env ]] #
     then echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" |& #
   # create /opt/etc/piavpn-manual/sha1sum.env #
-         tee >(_logger) >/dev/null & #
+         tee >(_logger) >/dev/null #
          sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
 
 #else echo "Running interactively skipped checksum and .env check" #
@@ -268,11 +267,11 @@
          if _is_empty "${PIA_USER}" \
               || 
             _is_empty "${PIA_PASS}" #
-         then echo  "Missing PIA Credentials" |
+         then echo  "Missing PIA Credentials" |& #
        # NO CREDENTIALS, we can forgetabout it #
               tee >(_logger) >(_pia_notify "${BOTHER}") >/dev/null #
               sleep "$((BOTHER/1000+1))" #
-              _pia_notify "CONNECTION FAILED" "$((BOTHER-5000))"#
+              _pia_notify "CONNECTION FAILED" "$((BOTHER-5000))" #
               exit 1 #
          fi #
 
@@ -280,7 +279,7 @@
        # AUTOCONNECT|CONNMAN_CONNECT = false|null requires using Settings > CoreELEC > Connections #
        #   and sets NO FIREWALL or port forwarding #
 
-       # ensure AUTOCONNECT is set, and go from there #
+       # set AUTOCONNECT, and go from there #
          AUTOCONNECT="${AUTOCONNECT:-false}" #
 
           if [[ -z "${AUTOCONNECT##[t|T]*}" ]] #
@@ -305,7 +304,7 @@
        # in a post-modem world #
          _is_empty "${PREFERRED_REGION}" \
            && { _pia_notify "PREFERRED_REGION is unset this will take a while" "${BOTHER}";
-                sleep "$((BOTHER/2000))"; } #
+            sleep "$((BOTHER/1000+1))"; } #
 
        # set PIA_PF and PIA_DNS, notify if forcing PIA_DNS #
          PIA_PF="${PIA_PF:-false}" #
@@ -524,7 +523,7 @@ else
   selectServer="no"
 fi
   # pia-foss manual connections does not export AUTOCONNECT #
-  # needed at connection step in post_up.sh  #
+  # needed at connection step  #
     export AUTOCONNECT #
 # Prompt the user to specify a server or auto-connect to the lowest latency
 while :; do
