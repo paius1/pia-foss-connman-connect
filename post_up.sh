@@ -65,7 +65,7 @@
         echo "from .env file"
  }
 
-  # variables set in normal run_setup.sh call if unset check .env file
+  # variables set in normal run_setup.sh call, if unset check .env file
     check_vars AUTOCONNECT PIA_PF PIA_DNS WG_FIREWALL
 
   # same as run_setup.sh
@@ -74,7 +74,7 @@
     PIA_DNS="${PIA_DNS:-true}"
 
   # variables set in normal connect_to_w...sh call
-  # from /storage/.config/wireguard/pia${cli}.config (cli is passed when _is_tty)
+  # from /storage/.config/wireguard/pia${cli}.config ($cli is passed when _is_tty)
     declare Host Domain Name WireGuard_DNS
     eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia"${cli}".config |
             sed 's/\./_/;s/ = \(.*\)$/="\1"/g')"
@@ -85,18 +85,20 @@
     REGION_NAME="${BASH_REMATCH[1]:-}"
     WireGuard_DNS="${WireGuard_DNS//_/.}"
 
+    shopt -s nocasematch
+
   # post_up.sh is kind of a misnomer
-    if [[ ! "${CONNMAN_CONNECT}" =~ ^[t|T] ]] \
+    if [[ "${CONNMAN_CONNECT}" != *"t"* ]] \
          &&
-       [[ "${AUTOCONNECT:-false}" =~ ^[f|F] ]] #
+       [[ "${AUTOCONNECT:-false}" == *"f"* ]] #
     then 
   # both systemd and the user don't want to connect
          echo 'AUTOCONNECT='"${AUTOCONNECT}"' CONNMAN_CONNECT='"${CONNMAN_CONNECT}"'' |
          tee >( _logger ) >( _is_not_tty && _pia_notify 6000 'pia_off_48x48.png' ) >/dev/null
            _is_not_tty \
-           && sleep 6
+             && sleep 6
 
-       # recreate inline variables from connect_to_w...sh
+       # recreate inline variables from connect_to_w...sh for function
          read -r PIA_TOKEN</opt/etc/piavpn-manual/token; WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" \
          _print_connection_instructions
          exit 0
@@ -105,6 +107,8 @@
   # message for _is_tty and pia-wireguard.log
     if [[ "${PRE_UP_RUN}" != 'true' ]]
     then >&2 _logger "Finishing up ..."; fi
+
+    shopt -u nocasematch
 
 # PIA currently does not support IPv6. In order to be sure your VPN
 # connection does not leak, it is best to disabled IPv6 altogether.
@@ -119,6 +123,8 @@
     fi
 
   # Connect with connmanctl
+       readarray -t services < <(connmanctl services)
+       [[ "${services[0]}" =~ (vpn_.*)$ ]]
     until [[ -n "${wg_0:=${BASH_REMATCH[1]}}" ]]
     do connmanctl connect "${SERVICE}" 2>/dev/null
        ((n++)) 
@@ -155,7 +161,9 @@ done
          exit "${n}"
     fi
 
-    if [[ "${PIA_DNS}" == "true" ]]
+    shopt -s nocasematch
+
+    if [[ "${PIA_DNS}" == *"t"* ]]
     then
   # Check and reset nameservers set by connmanctl
          mapfile -t resolv_conf < /run/connman/resolv.conf
@@ -171,21 +179,22 @@ done
               echo
          fi
        ## https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
-         #up="$(</proc/uptime)"
-         #if [[ "${up%%.*}" -gt 120 ]]
+         #read -r -d. up < /proc/uptime
+         #if [[ "${up}" -gt 120 ]]
          #then DNS_SERVER=("$(_parse_JSON 'city' < <(./dnsleaktest.py -j ) | head -1)")
               #echo  "DNS server is in ${DNS_SERVER[0]}" |
               #tee >(_logger) >(_is_not_tty && _pia_notify) >/dev/null
               #sleep 3
          #fi
     fi
+    shopt -u nocasematch
 
   # request port for forwarding
-    if [[ $PIA_PF != "true" ]]
+    if [[ $PIA_PF != *"t"* ]]
     then
   # No, print instructions for starting port forwarding later
          echo -e "    To enable port forwarding run\n"
-         read -r PIA_TOKEN</opt/etc/piavpn-manual/token #; WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}"
+         read -r PIA_TOKEN</opt/etc/piavpn-manual/token #
          echo -e " PIA_TOKEN=${PIA_TOKEN} PF_GATEWAY=${Host//_/.} PF_HOSTNAME=${Domain}  \\"
          echo -e " $(pwd)/port_forwarding.sh"
          echo
@@ -252,18 +261,19 @@ done
               ( sleep 2
                 PIA_TOKEN="${tokenFile[0]}" PF_GATEWAY="${Host//_/.}" PF_HOSTNAME="${Domain}" "$(pwd)"/port_forwarding.sh >> /tmp/port_forward.log 2>&1
               )>/dev/null 2>&1 & 
-              #disown
+              disown
          else echo "Failed to find a valid token"
               PIA_PF=false
          fi
     fi #
+    shopt -u nocasematch
 
 #########################################################
 # Note to self:                                         #
 # Check /storage/.config/autostart.sh for any conflicts #
 #########################################################
-    up="$(</proc/uptime)"
-    if [[ "${up%%.*}" -lt 60 ]]
+    read -r -d. up </proc/uptime
+    if [[ "${up}" -lt 60 ]]
     then #_logger "taking 3"
   # SYSTEM START, wait and load ip_tables module if required
          #sleep 3
@@ -275,8 +285,8 @@ done
               sleep 1
          fi
 
-         [[ ! "$(lsmod)" == *"ip_tables"* ]] \
-           && _logger "${BASH_REMATCH[0]} module loaded"
+         [[ "$(lsmod)" == *"ip_tables"* ]] \
+           && _logger "ip_tables module loaded"
     fi
 
   # Iptables-restore vpn killswitch #
