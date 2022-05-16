@@ -312,15 +312,16 @@ while true; do
 >&2    echo -e "${green}OK!${nc}" #
 >&2    echo #
 
-    if [ -z "${pf_firstrun+y}" ] #
-    then ((pf_firstrun++))
-         _logger "Forwarded port    $port" #
-         _logger "Refreshed at      $(date)" #
-         _logger "Expires at        $(date --date="$expires_at")" #
-         _logger "${BASH_SOURCE##*/} must remain active to use port forwarding," #
-         _logger "and will refresh every 15 minutes." #
-    else _logger "Rebinding to port ${port} @ $(date +'%I:%M:%S %D')" #
-    fi #
+        if [ -z "${pf_firstrun+y}" ] #
+        then ((pf_firstrun++))
+  ( echo -e Forwarded port'\t'"${green}$port${nc}" #
+    echo -e Refreshed on'\t'"${green}$(date)${nc}"
+    echo -e Expires on'\t'"${red}$(date --date="$expires_at")${nc}"
+    echo -e "\n${green}This script will need to remain active to use port forwarding, and will refresh every 15 minutes.${nc}\n"
+  ) |& #
+  tee >(_logger) >/dev/null #
+        else _logger "Rebinding to port ${port} @ $(date +'%I:%M:%S %D')" #
+        fi #
 
     # sleep 15 minutes
     sleep 900
