@@ -233,7 +233,9 @@
                    PIA_PF="${PIA_PF:-false}"
                    export PIA_TOKEN AUTOCONNECT PIA_DNS PIA_PF
 
-                   WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" ./connect_to_wireguard_with_token.sh
+                   WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" ./connect_to_wireguard_with_token.sh &
+                   disown
+#                  this exits to post_up.sh
 
                    exit 0
               fi #
