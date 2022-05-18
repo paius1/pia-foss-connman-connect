@@ -49,7 +49,7 @@
          then #
        # running non-interactively #
               for i in {1..7} #
-              do _pia_notify 'Testing for fastest Servers '"${dots:0:$((i*3))}"'' #
+              do _pia_notify 'Testing for fastest server '"${dots:0:$((i*3))}"'' #
                  sleep 4.9 #
               done&
               disown #
