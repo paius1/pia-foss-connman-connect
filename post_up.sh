@@ -37,6 +37,7 @@
 #exec > >(tee -a $LOG) #2>&1
 
   # by moving actual connection out of connect_to_w...sh
+  # and allowing reuse of pia.config < 24 hrs old
   # we lose $AUTOCONNECT etal, $SERVICE, $REGION_NAME, etc.
 
     function check_vars() {
@@ -85,9 +86,8 @@
     REGION_NAME="${BASH_REMATCH[1]:-}"
     WireGuard_DNS="${WireGuard_DNS//_/.}"
 
-    shopt -s nocasematch
-
   # post_up.sh is kind of a misnomer
+    shopt -s nocasematch
     if [[ "${CONNMAN_CONNECT}" != *"t"* ]] \
          &&
        [[ "${AUTOCONNECT:-false}" == *"f"* ]] #
@@ -105,7 +105,7 @@
     fi
 
   # message for _is_tty and pia-wireguard.log
-    if [[ "${PRE_UP_RUN}" != 'true' ]]
+    if [[ "${PRE_UP_RUN}" != *"t"* ]]
     then >&2 _logger "Finishing up ..."; fi
 
     shopt -u nocasematch
@@ -162,7 +162,6 @@ done
     fi
 
     shopt -s nocasematch
-
     if [[ "${PIA_DNS}" == *"t"* ]]
     then
   # Check and reset nameservers set by connmanctl
@@ -178,6 +177,8 @@ done
               /run/connman/resolv.conf
               echo
          fi
+
+  # Optional DNS check
        ## https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
          #read -r -d. up < /proc/uptime
          #if [[ "${up}" -gt 120 ]]
@@ -187,7 +188,6 @@ done
               #sleep 3
          #fi
     fi
-    shopt -u nocasematch
 
   # request port for forwarding
     if [[ $PIA_PF != *"t"* ]]
@@ -207,46 +207,9 @@ done
     else
   # Yes, start port_forward.sh
 
-         function _get_token() {
-             check_vars  PIA_USER PIA_PASS
-             if PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" "$(pwd)"/get_token.sh
-             then return 0
-             else return 1
-             fi
-         }        
-
-         if [[ -s "${tokenLocation:=/opt/etc/piavpn-manual/token}" ]]
-         then
-       # have tokenFile #
-
-            # check expiry
-            # https://stackoverflow.com/users/2318662/tharrrk
-              m2n() { printf '%02d' $((-10+$(sed 's/./\U&/g;y/ABCEGLNOPRTUVY/60AC765A77ABB9/;s/./+0x&/g'<<<${1#?}) ));}
-
-              mapfile -t tokenFile < "${tokenLocation}"
-            # 2 steps with builtins vs. awk
-              month="${tokenFile[1]#* }"
-               month="${month%% *}"
-                month="$(m2n "${month}")"
-              expiry_iso="$(awk '{printf "%d-%02d-%02dT%s", $NF,$2,$3,$4}' < <( awk -v month="${month}" '$2=month' <<< "${tokenFile[1]}"))"
-
-            # compare iso dates
-              if (( $(date -d "+30 min" +%s) < $(date -d "${expiry_iso}" +%s) ))
-              then echo "Previous token OK!"
-            # less than 24hrs old
-
-              else echo "token expired saving a new one to ${tokenLocation}"
-            # day old, refresh 
-                   unset tokenFile
-                   _get_token \
-                     && mapfile -t tokenFile < "${tokenLocation}"
-              fi
-
-         else 
        # get tokenFile
               _get_token \
                 && mapfile -t tokenFile < "${tokenLocation}"
-         fi
 
          if _is_set "${tokenFile[0]}"
          then echo "    logging port_forwarding to /tmp/port_forward.log" |&
