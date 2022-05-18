@@ -208,8 +208,10 @@ done
   # Yes, start port_forward.sh
 
        # get tokenFile
-              _get_token \
-                && mapfile -t tokenFile < "${tokenLocation}"
+             check_vars  PIA_USER PIA_PASS
+             PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" "$(pwd)"/get_token.sh \
+               && mapfile -t tokenFile < /opt/etc/piavpn-manual/token
+         #fi
 
          if _is_set "${tokenFile[0]}"
          then echo "    logging port_forwarding to /tmp/port_forward.log" |&
