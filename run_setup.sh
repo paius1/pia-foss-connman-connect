@@ -108,34 +108,34 @@
        # force displaytime #
          sleep 5 #
 
-    elif _is_unset PRE_UP_RUN #
-    then export PRE_UP_RUN='cli' #
+    else export PRE_UP_RUN='cli' #
   # run is interactive: set PRE_UP_RUN and check systemd #
 
          case $(_service_is_active pia-wireguard) #
          in #
-       # systemd service active #
-            0|true)  printf "pia-wireguard service is running\n"
-                     printf "this will interfere with server selection, continue? ([N]o/[y]es): " #
-                     shopt -s nocasematch
-                     read -r continue #
-                     [[ "${continue}" != *"y"* ]] \
-                       && { echo "Goodbye";
-                             exit 0; } #
-                     shopt -u nocasematch
+            # service active #
+              0|true)  printf '%s\n%s' "pia-wireguard service is running" \
+                              "this will interfere with server selection, continue? ([N]o/[y]es): " #
+                       shopt -s nocasematch
+                       read -r continue #
+                       [[ "${continue}" != *"y"* ]] \
+                         && { echo "Goodbye";
+                               exit 0; } #
+                       shopt -u nocasematch
 
-                     systemd-cat -t pia-wireguard.cmdline -p notice < \
-                                 <(echo "Stopping pia-wireguard.service from the command line" |&
-                   # log this to systemd journal an log #
-                                   tee -i >(_logger) >/dev/null) #
+                       systemd-cat -t pia-wireguard.cmdline -p notice < \
+                                   <(echo "Stopping pia-wireguard.service from the command line" |&
+                     # log this to systemd journal an log #
+                                     tee -i >(_logger) >/dev/null) #
 
-                   # Stop pia-wireguard service #
-                     systemctl stop pia-wireguard.service & #
-                     disown #
-                   ;; #
+                     # Stop pia-wireguard service #
+                       systemctl stop pia-wireguard.service & #
+                       disown #
+                     ;; #
 
-            *|false) echo "pia-wireguard service? is not running" #
-             ;; #
+              *|false) echo "pia-wireguard service? is not running" #
+            # or not #
+               ;; #
          esac #
     fi #
 
