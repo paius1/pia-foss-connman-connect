@@ -47,7 +47,7 @@
          &&
        _is_not_tty \
          &&
-       [[ "$(systemctl list-unit-files pia-wireguard.service | wc -l)" -gt 3 ]]
+       [[  $(systemctl list-unit-files pia-wireguard.service) =~ able ]] #
     then
   # not called by systemd or interactively, and systemd service exists #
 
@@ -67,7 +67,7 @@
 
     elif _is_tty \
            &&
-         [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]]
+         [[  $(systemctl list-unit-files pia-wireguard.service) =~ able ]] #
     then
   # running interactively with systemd service
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)"

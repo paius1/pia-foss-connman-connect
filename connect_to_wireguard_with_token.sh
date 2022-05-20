@@ -296,7 +296,7 @@ echo -e "${green}OK!${nc}"
 
     if _is_tty \
          &&
-       [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
+       [[  $(systemctl list-unit-files pia-wireguard.service) =~ able ]] #
     then #
   # run interactive with systemd service #
          case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #

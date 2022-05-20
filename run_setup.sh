@@ -69,8 +69,8 @@
          &&
        _is_not_tty \
          &&
-       [[ "$( wc -l < <(systemctl list-unit-files pia-wireguard.service))" -gt 3 ]] #
-    then 
+       [[  $(systemctl list-unit-files pia-wireguard.service) =~ able ]] #
+    then #
   # not called by systemd or interactively, and systemd service exists #
 
          systemd-cat -t pia-wireguard.favourites -p notice < \
