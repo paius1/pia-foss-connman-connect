@@ -70,7 +70,7 @@
          [[  $(systemctl list-unit-files pia-wireguard.service) =~ able ]] #
     then
   # running interactively with systemd service
-         case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)"
+         case $(_service_is_active pia-wireguard)
          in
           # systemd service active
             0|true)  systemd-cat -t pia-wireguard.cmdline -p notice < \

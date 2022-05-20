@@ -299,7 +299,7 @@ echo -e "${green}OK!${nc}"
        [[  $(systemctl list-unit-files pia-wireguard.service) =~ able ]] #
     then #
   # run interactive with systemd service #
-         case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
+         case $(_service_is_active pia-wireguard) #
          in #
           # systemd service active #
             0|true)  printf "pia-wireguard service is running, continue? ([N]o/[y]es): " #

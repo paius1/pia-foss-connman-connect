@@ -162,8 +162,8 @@ fi
 
   # Handle shutdown #
     finish () { #
-        _logger < <( echo "Port forward stopped. The port close soon." |
-        tee >(systemctl --quiet is-active  pia-wireguard.service && _pia_notify 5000 'pia_off_48x48.png' ) ) #
+        echo "Port forward stopped, port will close soon." |
+        tee >(_logger) >(_service_is_active pia-wireguard >/dev/null && _pia_notify 5000 'pia_off_48x48.png') >/dev/null #
 
         #_logger "Port forward rebinding stopped. The port will likely close soon." #
 

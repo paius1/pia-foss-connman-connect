@@ -78,7 +78,7 @@
        # log this to systemd journal and pia-wireguard log #
                       tee >(LOG=/tmp/pia-wireguard.log _logger >/dev/null )) #
 
-         case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
+         case $(_service_is_active pia-wireguard) #
          in #
        # systemd service is active #
             0|true)  action='Restarting' #
@@ -112,7 +112,7 @@
     then export PRE_UP_RUN='cli' #
   # run is interactive: set PRE_UP_RUN and check systemd #
 
-         case "$(systemctl --quiet is-active  pia-wireguard.service; echo $?)" #
+         case $(_service_is_active pia-wireguard) #
          in #
        # systemd service active #
             0|true)  printf "pia-wireguard service is running\n"
