@@ -48,15 +48,18 @@
          if _is_not_tty #
          then #
        # running non-interactively #
-              for i in {1..7} #
+              for i in {1..8} #
               do _pia_notify 'Testing for fastest server '"${dots:0:$((i*3))}"'' #
                  sleep 4.9 #
               done&
+              echo $! >/tmp/server.socket
               disown #
          elif [[ "${PRE_UP_RUN}" = 'cli' ]] #
          then #
        # running interactively from ./run_startup.sh #
-                   for i in {1..33}; do echo -ne "\rTesting for fastest Servers ${dots:0:$((i*3))}"; sleep 1; done& disown #
+                   for i in {1..33}; do echo -ne "\rTesting for fastest Servers ${dots:0:$((i*3))}"; sleep 2; done&
+                   echo $! >/tmp/server.socket
+                   disown #
          fi #
     fi #
 
@@ -241,6 +244,9 @@ if [[ $selectedRegion == "none" ]]; then
     xargs -I{} bash -c 'printServerLatency {}' |
     sort | head -1 | awk '{ print $2 }')"
   echo
+
+      # stop the dots
+        kill $(</tmp/server.socket ) >/dev/null 2>&1; wait $(</tmp/server.socket ) #
 
   if [[ -z $selectedRegion ]]; then
 # MAX_LATENCY is too low #
