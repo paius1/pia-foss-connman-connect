@@ -60,7 +60,8 @@
                                  break
                             fi
                        fi
-                    done < <(printf '%s\n' "${env[@]}" )
+                    done < <(printf '%s\n' "${env[@]}" | tail +1 )
+                                                     # fix for broken pipe?
                fi
             done
         echo "from .env file"
