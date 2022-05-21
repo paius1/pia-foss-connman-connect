@@ -158,7 +158,7 @@
     then :> /tmp/port_forward.log
   # stop port forwarding 
          echo "${pf_pids[@]}" |
-         xargs -d $'\n' sh -c 'for pid do kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null; done' _
+         xargs -d $'\n' sh -c 'for pid do kill -9 -$pid 2>/dev/null; wait $pid 2>/dev/null; done' _
          _logger "Stopped port forwarding"
          
     fi
