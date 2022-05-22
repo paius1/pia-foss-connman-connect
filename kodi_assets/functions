@@ -206,6 +206,15 @@
  }
     export -f _is_not_tty
 
+    function _service_is_active() {
+        local service="$1"
+        
+        systemctl --quiet is-active  pia-wireguard.service
+        echo $?
+        
+ }
+    export -f _service_is_active
+
     function _print_connection_instructions() {
         
         if _is_tty
