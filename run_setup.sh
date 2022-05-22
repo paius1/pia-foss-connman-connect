@@ -108,8 +108,8 @@
        # force displaytime #
          sleep 5 #
 
-    else export PRE_UP_RUN='cli' #
-  # run is interactive: set PRE_UP_RUN and check systemd #
+    else export PRE_UP_RUN="${PRE_UP_RUN:-cli}" #
+  # run is interactive: or PRE_UP_RUN is set #
 
          case $(_service_is_active pia-wireguard) #
          in #
@@ -133,7 +133,7 @@
                        disown #
                      ;; #
 
-              *|false) echo "pia-wireguard service? is not running" #
+              *|false) : #
             # or not #
                ;; #
          esac #
@@ -165,94 +165,143 @@
       #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4 #
       #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
 
-  # ConditionFileNotEmpty=.env #
-      # systemd fails on empty .env file #
-    if [[ -s .env ]] #
-    then _logger "Load .env file" #
-  # read variables from .env file #
-         source .env  #
+  # system maintanence for day old backup files #
+    find /opt/etc/piavpn-manual/ -name 'wireguard_json-*' -mmin +1440 -delete > /dev/null #
+    find /opt/etc/wireguard/ -name '*.conf~' -mmin +1440 -delete > /dev/null #
+    find /storage/.config/wireguard/ -name '*.config~' -mmin +1440 -delete > /dev/null #
 
-    elif _is_not_tty #
-    then echo "No valid PIA config -> $(pwd)/.env" |&
-  # fail without minimal .env file #
-         tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') >/dev/null #
-         sleep 10
+# Existing environment
+    # 1) interactive
+    # 2) .env file
+    # 3) pia.config
 
-         _pia_notify "CONNECTION FAILED" 100000 #
-         exit 1 #
+              # changes in .env file? #
+              # none and pia.config is < 24hrs old, skip to ./post_up.sh #
+              # when disconnecting touch pia.config to reset creation time #
+              # pia.config is > 24hrs old, reuse & skip to ./connect_to_wi....sh #
 
-    else echo "Get ready to rumble" #
-  # run is interactive w/o a .env file #
-    fi #
-
-  # system maintanence for day old backup files
-    find /opt/etc/piavpn-manual/ -name 'wireguard_json-*' -mmin +1440 -delete > /dev/null
-    find /opt/etc/wireguard/ -name '*.conf~' -mmin +1440 -delete > /dev/null
-    find /storage/.config/wireguard/ -name '*.config~' -mmin +1440 -delete > /dev/null
-
-  # changes in .env file? # NOTE to self when disconnecting touch pia.config to reset creation time
-      # none and pia.config is < 24hrs old, skip to ./post_up.sh #
-      # pia.config is > 24hrs old, reuse...skip to ./connect_to_wi....sh #
+  # Ideal conditions #
     if _is_not_tty \
          &&
+       [[ -s .env ]] \
+         &&
        [[ -s /opt/etc/piavpn-manual/sha1sum.env ]] #
-    then _logger "Checking current .env file with previous" #
-  # not running interactively, have checksum for .env #
+    then _logger "Checking current .env" #
+  # not running interactively, have .env & checksum #
 
-         if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]] #
-         then _logger "    .env is unchanged" #
-       # .env is unchanged #
+               # PIA-FOSS scripts export these variables, systemd doesn't #
+                 set -a #
+                 source .env #
 
-              age_pia_config="$(_interval "$(_created /storage/.config/wireguard/pia.config)")" #
+  # environment unchanged and pia.config recent? #
+                 if [[ $(</opt/etc/piavpn-manual/sha1sum.env) = $(sha1sum .env) ]]
+                 then _logger "    unchanged" #
+               # .env is unchanged #
 
-              if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
-              then _logger "    pia.config last connected $(_hmmss "${age_pia_config}") ago" #
-            # wireguard/pia.config is less that 24 hours old   #
+                      age_pia_config="$(_interval "$(_created /storage/.config/wireguard/pia.config)")" #
+                      if [[ "${age_pia_config}" -lt $((24*60*60)) ]] #
+                      then _logger "    pia.config last connected $(_hmmss "${age_pia_config}") ago" #
+  # wireguard/pia.config is less that 24 hours old #
+                    # proceed to connection #
 
-                   case "${PRE_UP_RUN}" #
-                   in #
-                    # exit for systemd ExecStartPost #
-                      t*) exit 0 ;; #
-                      *)  ./post_up.sh & exit 0 ;; #
-                    # call ./post_up.sh & exit for favourites #
-                   esac #
+                           case "${PRE_UP_RUN}" #
+                           in #
+                            # exit for systemd ExecStartPost #
+                              t*) exit 0 ;; #
+                              *)  ./post_up.sh &
+                            # call ./post_up.sh & exit #
+                                  disown #
+                                  exit 0 ;; #
+                           esac #
+        
+                      elif [[ "${age_pia_config}" -lt 1653000000 ]] #
+                      then _logger "    Refreshing $(_hmmss "${age_pia_config}") old pia.config" #
+               # day old config #
+                         # pass old pia.config and .env to connect_to_wireguard...sh
+                         # skips get_region.sh
+                         # pia.config > 24hrs assume same for token
 
-              else _logger "Refreshing pia.config" #
-            # day old config #
-                 # pass old pia.config and .env to connect_to_wireguard...sh
-                 # skips get_region.sh
-                   declare Host Domain
-                   eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' ~/.config/wireguard/pia"${cli}".config |
-                                sed 's/\./_/;s/ = \(.*\)$/="\1"/g')"
+                         # pia.config > 24hrs assume same for token #
+                           ./get_token.sh \
+                             || #
+                           rm /opt/etc/piavpn-manual/token #
 
-                   PIA_USER="${PIA_USER}" PIA_PASS="${PIA_PASS}" ./get_token.sh
-                 # pass same variables as a complete run
-                   read -r PIA_TOKEN </opt/etc/piavpn-manual/token #
-                   AUTOCONNECT="${AUTOCONNECT:-false}"
-                   PIA_DNS="${PIA_DNS:-true}"
-                   PIA_PF="${PIA_PF:-false}"
-                   export PIA_TOKEN AUTOCONNECT PIA_DNS PIA_PF
+                           if ! read -r PIA_TOKEN </opt/etc/piavpn-manual/token 2>/dev/null #
+                           then echo "failed to generate an authentication token" |& #
+                         # script failed to generate an authentication token, the script will exit early. #
+                                tee >(_logger) >(_pia_notify 10000 'pia_off_48x48.png') >/dev/null #
+                                exit 1 #
+                           fi #
 
-                   WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" ./connect_to_wireguard_with_token.sh &
-                   disown
-#                  this exits to post_up.sh
+                         # pass same variables as a complete run #
+                           AUTOCONNECT="${AUTOCONNECT:-false}" #
+                           PIA_DNS="${PIA_DNS:-true}" #
+                           PIA_PF="${PIA_PF:-false}" #
 
-                   exit 0
-              fi #
+                         # inline variables for script #
+                           declare Host Domain #
+                           eval "$(grep -e '^[[:blank:]]*[[:alpha:]]' /storage/.config/wireguard/pia.config |
+                                        sed 's/\./_/;s/ = \(.*\)$/="\1"/g')" #
 
-         else _logger "      .env file has changed, running thru setup" #
-       # Save checksum for changed file #
-               sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
-         fi #
+                           WG_SERVER_IP="${Host//_/.}" WG_HOSTNAME="${Domain}" ./connect_to_wireguard_with_token.sh & #
+                         # this exits to post_up.sh
+                           disown #
+
+                           exit 0 #
+                      fi #
+
+                 else _logger "    .env file has changed, running thru setup" #
+               # .env changed #
+                       sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
+               # Save new checksum #
+               # and proceed #
+                 fi #
+
+               # stop exporting changes #
+                 set +a #
+
+  # Non-ideal conditions #
+  # first run? #
+  # do we have sufficent information #
 
     elif [[ ! -s /opt/etc/piavpn-manual/sha1sum.env ]] #
-    then echo "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" |& #
-  # create /opt/etc/piavpn-manual/sha1sum.env #
-         tee >(_logger) >/dev/null #
-         sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
+    then #
+  # check for .env file & create sha1sum #
+  # have we run before and do have we defined variables #
 
-#else echo "Running interactively skipped checksum and .env check" #
-# running interactively #
+         if sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env #
+         then _logger "saving sha1sum .env > /opt/etc/piavpn-manual/sha1sum.env" #
+       # .env exists #
+# DEBUGGING
+# shellcheck source=/media/paul/coreelec/storage/sources/pia-wireguard/.env
+              source .env
+
+         else echo "No $(pwd)/.env" |& #
+       # .env doesn't exist, is input possible #
+              tee >(_logger) >( is_not_tty && _pia_notify 10000 'pia_off_48x48.png') >/dev/null #
+              if is_not_tty #
+              then sleep 10 #
+            # fail non-interactive without minimal .env file #
+                   _pia_notify "CONNECTION FAILED" 100000 #
+                   exit 1 #
+              fi #
+         fi #
+
+    elif ! source .env 2>/dev/null 
+    then echo "No $(pwd)/.env" |& #
+  # final check for a .env file #
+              tee >(_logger) >( is_not_tty && _pia_notify 10000 'pia_off_48x48.png') >/dev/null #
+              if is_not_tty #
+              then sleep 10 #
+            # fail non-interactive without minimal .env file #
+                   _pia_notify "CONNECTION FAILED" 100000 #
+                   exit 1 #
+              fi #
+              echo "ready to rumble" #
+            # condition [[ -s sha1sum.env ]] && _is_tty
+
+    else echo "Get ready to rumble" #
+  # none of the above apply #
     fi #
 
   # NON-INTERACTIVE CHECK/SET VARIABLES #
@@ -644,7 +693,7 @@ For example, you can try 0.2 for 200ms allowed latency.
               # running non-interactively got ordered list choosing fastest #
                 else # choose best region and proceed #
                      read -r line</opt/etc/piavpn-manual/latencyList #
-                     PREFERRED_REGION=$([[ "$line" =~ [[:space:]]([^[:space:]]*) ]] && echo "${BASH_REMATCH[0]}" ) #
+                     PREFERRED_REGION=$([[ "$line" =~ [[:space:]]([^[:space:]]*) ]] && echo "${BASH_REMATCH[1]}" ) #
                      export PREFERRED_REGION #
                      REGION="$( _parse_JSON 'name' < /opt/etc/piavpn-manual/regionData )" #
                      echo 'Selected for '"${REGION}"'' |& #
