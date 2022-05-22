@@ -1,5 +1,5 @@
 #!/opt/bin/bash
-#    v 0.0.1, c plgroves gmail 2022
+#    v 0.9.0, c plgroves gmail 2022
 #    SCRIPTNAME called by ExecStartPre in service file
 #              PATH/run_setup.sh
 #           or PATH/connect_to_wireguard_with_token.sh,

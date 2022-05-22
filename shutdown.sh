@@ -1,5 +1,5 @@
 #!/opt/bin/bash
-#    v 0.0.1
+#    v 0.9.0, c plgroves gmail 2022
 #    SCRIPTNAME  called by systemctl stop pia-wireguard.service
 #                or by System.Exec in Favourites
 #        
@@ -184,7 +184,7 @@
     then
   # stop port forwarding 
          echo "${pf_pids[@]}" |
-         xargs -d $'\n' sh -c 'for pid do kill -15 -$pid 2>/dev/null; wait $pid 2>/dev/null; done' _
+         xargs -d $'\n' sh -c 'for pid do kill -9 -$pid 2>/dev/null; wait $pid 2>/dev/null; done' _
 
        # clear the log file ?
          :> /tmp/port_forward.log

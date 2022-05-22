@@ -1,5 +1,5 @@
 #!/opt/bin/bash
-#    v 0.0.1, c plgroves gmail 2022
+#    v 0.9.0, c plgroves gmail 2022
 #    SCRIPTNAME called by systemd ExecStartPost
 #               or PATH/connect_to_wireguard_with_token.sh,
 #               when run from favourites or tty
@@ -180,7 +180,7 @@ done
          fi
 
   # Optional DNS check
-       ## https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
+       # https://gist.github.com/Tugzrida/6fe83682157ead89875a76d065874973
          #read -r -d. up < /proc/uptime
          #if [[ "${up}" -gt 120 ]]
          #then DNS_SERVER=("$(_parse_JSON 'city' < <(./dnsleaktest.py -j ) | head -1)")
@@ -221,8 +221,7 @@ done
 
             # allow post_up.sh to continue
 
-                echo " PIA_TOKEN=${tokenFile[0]} PF_GATEWAY=${Host//_/.} PF_HOSTNAME=${Domain} $(pwd)/port_forwarding.sh" |&
-                tee >(_logger) >/dev/null
+                _logger " PIA_TOKEN=${tokenFile[0]} PF_GATEWAY=${Host//_/.} PF_HOSTNAME=${Domain} $(pwd)/port_forwarding.sh" #|&
 
               ( sleep 2
                 PIA_TOKEN="${tokenFile[0]}" PF_GATEWAY="${Host//_/.}" PF_HOSTNAME="${Domain}" "$(pwd)"/port_forwarding.sh >> /tmp/port_forward.log 2>&1
