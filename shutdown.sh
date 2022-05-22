@@ -180,7 +180,7 @@
   # port forwarding cleanup
     pf_pids=($(pidof port_forwarding.sh))
 
-    if [ "${#pf_pids[@]}" -ne 0 ]
+    if [[ "${#pf_pids[@]}" -ne 0 ]]
     then
   # stop port forwarding 
          echo "${pf_pids[@]}" |
