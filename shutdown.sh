@@ -89,7 +89,7 @@
          esac
     else
   # no systemd service
-         LOG='/tmp/pia-wireguard.log'
+         LOG="${LOG:-/tmp/pia-wireguard.log}"
     fi
 
   # disconnect vpn_
@@ -124,14 +124,7 @@
 
   # Check for user defined iptables rules
     nl=$'\n'
-    match='MY_FIREWALL='
-    while read -r line
-    do if [[ "${line}" =~ .*${match}[^${nl}]* ]]
-       then eval "${BASH_REMATCH[0]}"
-            _is_set "${MY_FIREWALL}" \
-              && break
-       fi
-    done < .env
+    eval "$([[ "$(<.env)" =~ ([^${nl}]*MY_FIREWALL=[^${nl}]*) ]] && echo "${BASH_REMATCH[1]}")"
 
   # restore firewall (user defined or ./openrules.v4)
     iptables-restore < "${MY_FIREWALL:=openrules.v4}" \

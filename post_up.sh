@@ -51,26 +51,20 @@
         echo -n "SET "
             for var_name in "${var_names[@]}"
             do if _is_empty "${!var_name}"
-               then match=".*${var_name}="
-                    while read -r line
-                    do if [[ "${line}" =~ ${match}[^${nl}]* ]]
-                       then eval "${BASH_REMATCH[0]}"
-                            if _is_set "${!var_name}"
-                            then echo -n "$var_name=${!var_name} "
-                                 break
-                            fi
-                       fi
-                    done < <(printf '%s\n' "${env[@]}" | tail +1 )
-                                                     # fix for broken pipe?
+               then eval "$([[ $(printf '%s\n' "${env[@]}") =~ ([^${nl}]*${var_name}=[^${nl}]*) ]] && echo "${BASH_REMATCH[1]}")"
+                    if _is_set "${!var_name}"
+                    then echo -n "$var_name=${!var_name} "
+                    fi
                fi
             done
         echo "from .env file"
  }
 
-  # variables set in normal run_setup.sh call, if unset check .env file
+  # variables set in normal run_setup.sh call
+  # if unset check .env file
     check_vars AUTOCONNECT PIA_PF PIA_DNS WG_FIREWALL
 
-  # same as run_setup.sh
+  # or set to defaults
     AUTOCONNECT="${AUTOCONNECT:-false}"
     PIA_PF="${PIA_PF:-false}"
     PIA_DNS="${PIA_DNS:-true}"
