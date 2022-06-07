@@ -246,6 +246,8 @@ if [[ $selectedRegion == "none" ]]; then
   echo
 
       # stop the dots
+        [[ -f /tmp/server.socket ]] \
+          &&
         kill $(</tmp/server.socket ) >/dev/null 2>&1; wait $(</tmp/server.socket ) #
 
   if [[ -z $selectedRegion ]]; then
