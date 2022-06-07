@@ -42,15 +42,12 @@
       # This section allows reading from a tee
       # e.g. echo "Hello World" | tee >(_logger [log [source]]) >/dev/null
       # wait for stdin from a pipe
-        sleep 0.01
+        #sleep 0.01
 
       # there is something in stdin
-        read -t 0 \
-          && new_1=$(</dev/stdin)
-
-      # prepend to parameters
-        _is_empty "${new_1}" \
-          || set -- "${new_1}" "${@:1:2}"
+        [[ -p /dev/stdin ]] \
+          && 
+        set -- "$(</dev/stdin)" "${@:1:2}"
       #
         message="${1:-lorem ipsum dolor sit amet}"
       # remove ANSI escape sequences
@@ -107,14 +104,12 @@
       # This section allows reading from a tee
       # e.g. echo "Hello World" | tee >(_pia_notify [displaytime [image]]) >/dev/null
       # wait for stdin from a pipe
-        sleep 0.01
+        #sleep 0.01
 
       # there is something in stdin put it in ${@:1}
-        read -t 0 \
-           && new_1="$( </dev/stdin)"
-
-        _is_empty "${new_1}" \
-           || set -- "${new_1}" "${@:1:2}"
+        [[ -p /dev/stdin ]] \
+          && 
+        set -- "$(</dev/stdin)" "${@:1:2}"
 
       # only last line of multi line messages
         message="$(sed -n '$p' <<< "${1:-lorem ipsum dolor sit amet}")"
@@ -158,9 +153,8 @@
     function _interval() {
         local now th3n
         th3n="${1:-1}"
-    
-        now="$(printf '%(%s)T' |
-               tee "${2:-/dev/null}")"
+
+        printf -v now '%(%s)T'
         echo -n "$((now-th3n))"
     return 0
  }
@@ -209,7 +203,7 @@
     function _service_is_active() {
         local service="$1"
         
-        systemctl --quiet is-active  pia-wireguard.service
+        systemctl --quiet is-active  "${service}"
         echo $?
         
  }
@@ -220,6 +214,7 @@
         if _is_tty
         then
       # running interactively
+             cli="${cli:-}"
              (echo -e "to connect manually go to
 \tSettings > Coreelec > Connections, select PIA ${cli#-*} and connect
 \t    This may not set DNS and\tWILL NOT set iptables killswitch?
