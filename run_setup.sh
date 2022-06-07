@@ -34,6 +34,32 @@
 # PIA_USER=pXXXXXXX  PIA_PASS=P455w0rd AUTOCONNECT=true PIA_DNS=true|false PIA_PF=true|false ./run_setup.sh 
 # the more variables you set the less interactive
 
+  # possible variables for .env #
+    # REQUIRED: when not running from a shell #
+      #   PIA_USER='pXXXXXXX' #
+      #   PIA_PASS='p45sw0rdxx' #
+      #
+    # one of #
+      #   PREFERRED_REGION= [ run PIA_PF=(true|false) ./get_region ] #
+      #         OR #
+      #   AUTOCONNECT='false|true' n.b. AUTOCONNECT='true' overrides PREFERRED_REGION #
+      #                                 AUTOCONNECT='false' sets MAX_LATENCY=0.05 #
+      #                                 and it will run through all available servers #
+      #                                 which takes a long time om a post-modem world #
+      #         OR #
+      #   export CONNMAN_CONNECT='true|false' n.b. this is set in the service file #
+      #
+    # optional #
+      #   PIA_PF='true|false' (default false) #
+      #   PIA_DNS='true|false' (default true) #
+      #   MAX_LATENCY=99-0.001 (default is 0.05 if that doesn't work raise it) #
+      #
+      # these variable are not included in the pia scripts #
+      #               THEY MUST BE EXPORTED #
+      # if you want to use a custom set of iptables rules then define them here #
+      #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4 #
+      #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
+
   # PIA's scripts are set to a relative path #
     cd "${0%/*}" || exit 1 #
 
@@ -138,32 +164,6 @@
                ;; #
          esac #
     fi #
-
-  # possible variables for .env #
-    # REQUIRED: when not running from a shell #
-      #   PIA_USER='pXXXXXXX' #
-      #   PIA_PASS='p45sw0rdxx' #
-      #
-    # one of #
-      #   PREFERRED_REGION= [ run PIA_PF=(true|false) ./get_region ] #
-      #         OR #
-      #   AUTOCONNECT='false|true' n.b. AUTOCONNECT='true' overrides PREFERRED_REGION #
-      #                                 AUTOCONNECT='false' sets MAX_LATENCY=0.05 #
-      #                                 and it will run through all available servers #
-      #                                 which takes a long time om a post-modem world #
-      #         OR #
-      #   export CONNMAN_CONNECT='true|false' n.b. this is set in the service file #
-      #
-    # optional #
-      #   PIA_PF='true|false' (default false) #
-      #   PIA_DNS='true|false' (default true) #
-      #   MAX_LATENCY=99-0.001 (default is 0.05 if that doesn't work raise it) #
-      #
-      # these variable are not included in the pia scripts #
-      #               THEY MUST BE EXPORTED #
-      # if you want to use a custom set of iptables rules then define them here #
-      #   export MY_FIREWALL=/path/to/my/iptables/openrules.v4 #
-      #   export WG_FIREWALL=/path/to/my/iptables/openrules.v4 #
 
   # system maintanence for day old backup files #
     find /opt/etc/piavpn-manual/ -name 'wireguard_json-*' -mmin +1440 -delete > /dev/null #
